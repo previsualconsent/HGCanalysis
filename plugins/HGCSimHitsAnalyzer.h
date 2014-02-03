@@ -16,6 +16,10 @@
 
 #include "DataFormats/Candidate/interface/Candidate.h"
 
+#include "UserCode/HGCanalysis/interface/HGCSimulationEvent.h"
+
+#include "TTree.h"
+
 #include <string>
 
 /**
@@ -41,6 +45,9 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   bool geometryDefined_;
   std::string ddViewName_;
   std::string eeHits_, heHits_, genSource_;
+
+  TTree *t_;
+  HGCSimEvent_t simEvt_;
 };
  
 

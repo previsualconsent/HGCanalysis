@@ -23,6 +23,16 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   eeHits_      = iConfig.getUntrackedParameter<std::string>("eeHits",     "HGCHitsEE");
   heHits_      = iConfig.getUntrackedParameter<std::string>("heHits",     "HGCHitsHE");
   genSource_   = iConfig.getUntrackedParameter<std::string>("genSource",  "genParticles");
+
+  edm::Service<TFileService> fs;
+  t_=fs->make<TTree>("HGC","Event Summary");
+  t_->Branch("run",      &simEvt_.run,      "run/I");
+  t_->Branch("lumi",     &simEvt_.lumi,     "lumi/I");
+  t_->Branch("event",    &simEvt_.event,    "event/I");
+  t_->Branch("nee",      &simEvt_.nee,      "nee/I");
+  t_->Branch("ee_layer",  simEvt_.ee_layer, "ee_layer[nee]/I");
+  t_->Branch("ee_edep",   simEvt_.ee_edep,  "ee_edep[nee]/F");
+  t_->Branch("ee_t",      simEvt_.ee_t,     "ee_t[nee]/F");
 }
 
 //
@@ -61,7 +71,14 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
   edm::Handle<edm::PCaloHitContainer> caloHitsHE;
   iEvent.getByLabel(edm::InputTag("g4SimHits",heHits_),caloHitsHE); 
 
+  simEvt_.run    = iEvent.id().run();
+  simEvt_.lumi   = iEvent.luminosityBlock();
+  simEvt_.event  = iEvent.id().event();
+
+  simEvt_.nee=0;
   analyzeEEHits(caloHitsEE,genParticles);
+  
+  if(simEvt_.nee>0)  t_->Fill();
 }
 
 //
@@ -78,17 +95,22 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
   for(edm::PCaloHitContainer::const_iterator hit_it = caloHits->begin(); hit_it != caloHits->end(); ++hit_it) 
     {
       HGCEEDetId detId(hit_it->id());
-      double den=hit_it->energy();
-      std::cout << hex << "0x" << uint32_t(detId) << dec 
-		<< " | isFwd=" << detId.isForward()
-		<< " isEE=" << detId.isEE() 
-		<< " zside=" << detId.zside() 
-		<< " layer=" << detId.layer() 
-		<< " subsec=" << detId.subsector() 
-		<< " module=" << detId.module()
-		<< " cell=" << detId.cell() 
-		<< " | den=" << den
-		<< std::endl;
+
+      simEvt_.ee_layer[simEvt_.nee] = detId.layer();
+      simEvt_.ee_edep[simEvt_.nee]  = hit_it->energy();
+      simEvt_.ee_t[simEvt_.nee]     = hit_it->time();
+      simEvt_.nee++;
+
+//       std::cout << hex << "0x" << uint32_t(detId) << dec 
+// 		<< " | isFwd=" << detId.isForward()
+// 		<< " isEE=" << detId.isEE() 
+// 		<< " zside=" << detId.zside() 
+// 		<< " layer=" << detId.layer() 
+// 		<< " subsec=" << detId.subsector() 
+// 		<< " module=" << detId.module()
+// 		<< " cell=" << detId.cell() 
+// 		<< " | den=" << den
+// 		<< std::endl;
     }
 }
 
