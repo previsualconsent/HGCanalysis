@@ -33,6 +33,8 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   virtual void analyze( const edm::Event&, const edm::EventSetup& );
 
  private:
+
+  bool defineGeometry(edm::ESTransientHandle<DDCompactView> &ddViewH);
   
   void analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &caloHits, edm::Handle<edm::View<reco::Candidate> > &gen);
 

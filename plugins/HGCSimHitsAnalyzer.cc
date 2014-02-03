@@ -44,15 +44,14 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
     if (!ddViewH.isValid() || !ddViewH.description()) {
       cout << "[HGCSimHitsAnalyzer::analyze] Handle for DD is not valid or does not contain any valid description" << endl;
       return;
-    }
+    }    
 
-    //const DDCompactView &pToDDView=*ddViewH;
-    
-
-    geometryDefined_=true;
-    std::cout << "[HGCSimHitsAnalyzer::analyze] geometry has been defined" << endl;    
+    geometryDefined_=defineGeometry(ddViewH);
+    if(geometryDefined_) { std::cout << "[HGCSimHitsAnalyzer::analyze] geometry has been defined" << endl;                      }
+    else                 { std::cout << "[HGCSimHitsAnalyzer::analyze] could not define geometry from DD view" << endl; return; }
   }
 
+  //get hits and gen level information
   edm::Handle<edm::View<reco::Candidate> > genParticles;
   iEvent.getByLabel(edm::InputTag(genSource_), genParticles);
 
@@ -63,6 +62,13 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
   iEvent.getByLabel(edm::InputTag("g4SimHits",heHits_),caloHitsHE); 
 
   analyzeEEHits(caloHitsEE,genParticles);
+}
+
+//
+bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &ddViewH)
+{
+   //const DDCompactView &pToDDView=*ddViewH;
+  return true;
 }
 
 //
