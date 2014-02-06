@@ -10,7 +10,7 @@ process.TFileService = cms.Service("TFileService", fileName = cms.string('HGCSim
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 
 process.source = cms.Source("PoolSource",
-                            fileNames=cms.untracked.vstring('file:singleele_pt35.root')
+                            fileNames=cms.untracked.vstring('file:particlegun.root')
                             )
 
 process.hgcSimHitsAnalyzer = cms.EDAnalyzer("HGCSimHitsAnalyzer",

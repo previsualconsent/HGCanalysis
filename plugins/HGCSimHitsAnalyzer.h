@@ -13,10 +13,12 @@
 
 #include "SimDataFormats/CaloHit/interface/PCaloHit.h"
 #include "SimDataFormats/CaloHit/interface/PCaloHitContainer.h"
+#include "SimG4CMS/Calo/interface/HGCNumberingScheme.h"
 
 #include "DataFormats/Candidate/interface/Candidate.h"
 
 #include "UserCode/HGCanalysis/interface/HGCSimulationEvent.h"
+
 
 #include "TTree.h"
 
@@ -46,8 +48,11 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   std::string ddViewName_;
   std::string eeHits_, heHits_, genSource_;
 
+  HGCNumberingScheme *numberingScheme_;
+
   TTree *t_;
   HGCSimEvent_t simEvt_;
+  std::map<int, std::map<int, std::pair<float,float> > > eeSVpars_;
 };
  
 

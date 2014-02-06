@@ -4,6 +4,16 @@
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
 #include "SimG4CMS/Calo/interface/CaloHitID.h"
 
+#include "DetectorDescription/Core/interface/DDFilter.h"
+#include "DetectorDescription/Core/interface/DDFilteredView.h"
+#include "DetectorDescription/Core/interface/DDSolid.h"
+
+#include "DataFormats/GeometrySurface/interface/TrapezoidalPlaneBounds.h"
+
+#include "DataFormats/GeometryVector/interface/Basic3DVector.h"
+
+#include "CLHEP/Units/GlobalSystemOfUnits.h"
+
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
@@ -17,7 +27,7 @@
 using namespace std;
 
 //
-HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geometryDefined_(false)
+HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geometryDefined_(false), numberingScheme_(0)
 {
   ddViewName_  = iConfig.getUntrackedParameter<std::string>("ddViewName", "");
   eeHits_      = iConfig.getUntrackedParameter<std::string>("eeHits",     "HGCHitsEE");
@@ -30,9 +40,15 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   t_->Branch("lumi",     &simEvt_.lumi,     "lumi/I");
   t_->Branch("event",    &simEvt_.event,    "event/I");
   t_->Branch("nee",      &simEvt_.nee,      "nee/I");
+  t_->Branch("ee_zp",     simEvt_.ee_zp, "ee_zp[nee]/I");
   t_->Branch("ee_layer",  simEvt_.ee_layer, "ee_layer[nee]/I");
+  t_->Branch("ee_module", simEvt_.ee_module, "ee_module[nee]/I");
+  t_->Branch("ee_subsec", simEvt_.ee_subsec, "ee_subsec[nee]/I");
+  t_->Branch("ee_cell",   simEvt_.ee_cell,   "ee_cell[nee]/I");
   t_->Branch("ee_edep",   simEvt_.ee_edep,  "ee_edep[nee]/F");
   t_->Branch("ee_t",      simEvt_.ee_t,     "ee_t[nee]/F");
+  t_->Branch("ee_x",      simEvt_.ee_x,     "ee_x[nee]/F");
+  t_->Branch("ee_y",      simEvt_.ee_y,     "ee_y[nee]/F");
 }
 
 //
@@ -84,7 +100,55 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 //
 bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &ddViewH)
 {
-   //const DDCompactView &pToDDView=*ddViewH;
+  if(!ddViewH.isValid()) {
+    std::cout << "[HGCSimHitsAnalyzer][defineGeometry] invalid DD handle" << std::endl;
+    return false;
+  }
+  
+  const DDCompactView &cview=*ddViewH;
+
+  //get geometry parameters from DDD (cell size, layer limits, etc.)
+  DDSpecificsFilter filter0;
+  DDValue ddv0("Volume", "HGC", 0);
+  filter0.setCriteria(ddv0, DDSpecificsFilter::equals);
+  DDFilteredView fv0(cview);
+  fv0.addFilter(filter0);
+  fv0.firstChild();
+  DDsvalues_type sv0(fv0.mergedSpecifics());
+  std::vector<double> gpar;
+  DDValue ddv1("GeomParHGC");
+  if(DDfetch(&sv0,ddv1))  gpar = ddv1.doubles();
+  if(gpar.size()==0){
+    std::cout << "[HGCSimHitsAnalyzer][defineGeometry] failed to retrieve geometry parameters from DDD" << std::endl;
+    return false;
+  }
+  numberingScheme_=new HGCNumberingScheme(gpar);
+
+  
+  //parse the DD for sensitive volumes
+  DDExpandedView eview(cview);
+  std::map<DDExpandedView::nav_type,int> idMap;
+  do {
+    const DDLogicalPart &logPart=eview.logicalPart();
+    std::string name=logPart.name();
+
+    //only EE sensitive volumes for the moment
+    if(name.find("Sensitive")==std::string::npos) continue;
+    if(name.find("HGCalEE")==std::string::npos) continue;
+    
+    size_t pos=name.find("Sensitive")+1;
+    int layer=atoi(name.substr(pos,name.size()-1).c_str());
+   
+    //save half height and widths for the trapezoid
+    if(eeSVpars_.find(layer)!=eeSVpars_.end()) continue; 
+    std::vector<double> solidPars=eview.logicalPart().solid().parameters();
+    eeSVpars_[ layer ] = numberingScheme_->getCartesianMapFor(solidPars[3], solidPars[4], solidPars[5] );
+
+    std::cout << layer << " " << solidPars[3] << " " << solidPars[4] << " " << solidPars[5] << std::endl;
+
+  }while(eview.next() );
+
+  //all done here
   return true;
 }
 
@@ -96,9 +160,33 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
     {
       HGCEEDetId detId(hit_it->id());
 
-      simEvt_.ee_layer[simEvt_.nee] = detId.layer();
-      simEvt_.ee_edep[simEvt_.nee]  = hit_it->energy();
-      simEvt_.ee_t[simEvt_.nee]     = hit_it->time();
+      int layer=detId.layer();
+      if(eeSVpars_.find(layer) == eeSVpars_.end()){
+	std::cout << "[HGCSimHitsAnalyzer][analyzeEEHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << std::endl;
+	//continue;
+      }
+      
+      int cell=detId.cell();
+      if(eeSVpars_[layer].find(cell)==eeSVpars_[layer].end()){
+	std::cout << "[HGCSimHitsAnalyzer][analyzeEEHits] unable to find local coordinates for cell=" << cell << " @ layer=" << layer << std::endl;
+	//continue;
+      }
+      //std::pair<float,float> xy=eeSVpars_[layer][cell];
+      std::pair<float,float> xy(0,0);
+      int subsector=detId.subsector();
+      if(subsector==0) xy.first *=-1;
+
+      int module=detId.module();
+
+      simEvt_.ee_zp[simEvt_.nee]     = detId.zside();
+      simEvt_.ee_layer[simEvt_.nee]  = layer;
+      simEvt_.ee_module[simEvt_.nee] = module;
+      simEvt_.ee_cell[simEvt_.nee]   = detId.subsector();
+      simEvt_.ee_edep[simEvt_.nee]   = hit_it->energy();
+      simEvt_.ee_t[simEvt_.nee]      = hit_it->time();
+      simEvt_.ee_x[simEvt_.nee]      = xy.first;
+      simEvt_.ee_y[simEvt_.nee]      = xy.second;
+ 
       simEvt_.nee++;
 
 //       std::cout << hex << "0x" << uint32_t(detId) << dec 
