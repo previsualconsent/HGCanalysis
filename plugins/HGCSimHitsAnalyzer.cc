@@ -142,6 +142,10 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     //save half height and widths for the trapezoid
     if(eeSVpars_.find(layer)!=eeSVpars_.end()) continue; 
     std::vector<double> solidPars=eview.logicalPart().solid().parameters();
+    std::cout << logPart << endl;
+    for(size_t i=0; i<solidPars.size(); i++) std::cout << solidPars[i] << " ";
+    std::cout << endl;
+
     std::vector<double> layerPars;
     layerPars.push_back( solidPars[3] ); //height
     layerPars.push_back( solidPars[4] ); //bottom
@@ -187,7 +191,6 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       simEvt_.ee_t[simEvt_.nee]      = hit_it->time();
       simEvt_.ee_x[simEvt_.nee]      = xy.first;
       simEvt_.ee_y[simEvt_.nee]      = xy.second;
- 
       simEvt_.nee++;
 
 //       std::cout << hex << "0x" << uint32_t(detId) << dec 
