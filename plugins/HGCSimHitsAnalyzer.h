@@ -52,7 +52,9 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
 
   TTree *t_;
   HGCSimEvent_t simEvt_;
-  std::map<int, std::map<int, std::pair<float,float> > > eeSVpars_;
+
+  enum SVPars { HALF_H, HALF_B, HALF_T };
+  std::map<int, std::vector<double> > eeSVpars_;
 };
  
 

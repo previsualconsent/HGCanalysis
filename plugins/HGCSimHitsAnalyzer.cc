@@ -136,16 +136,17 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     if(name.find("Sensitive")==std::string::npos) continue;
     if(name.find("HGCalEE")==std::string::npos) continue;
     
-    size_t pos=name.find("Sensitive")+1;
-    int layer=atoi(name.substr(pos,name.size()-1).c_str());
+    size_t pos=name.find("Sensitive")+9;
+    int layer=atoi(name.substr(pos,name.size()).c_str());
    
     //save half height and widths for the trapezoid
     if(eeSVpars_.find(layer)!=eeSVpars_.end()) continue; 
     std::vector<double> solidPars=eview.logicalPart().solid().parameters();
-    eeSVpars_[ layer ] = numberingScheme_->getCartesianMapFor(solidPars[3], solidPars[4], solidPars[5] );
-
-    std::cout << layer << " " << solidPars[3] << " " << solidPars[4] << " " << solidPars[5] << std::endl;
-
+    std::vector<double> layerPars;
+    layerPars.push_back( solidPars[3] ); //height
+    layerPars.push_back( solidPars[4] ); //bottom
+    layerPars.push_back( solidPars[5] ); //top
+    eeSVpars_[ layer ] = layerPars;
   }while(eview.next() );
 
   //all done here
@@ -167,12 +168,11 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       }
       
       int cell=detId.cell();
-      if(eeSVpars_[layer].find(cell)==eeSVpars_[layer].end()){
-	std::cout << "[HGCSimHitsAnalyzer][analyzeEEHits] unable to find local coordinates for cell=" << cell << " @ layer=" << layer << std::endl;
-	//continue;
-      }
-      //std::pair<float,float> xy=eeSVpars_[layer][cell];
-      std::pair<float,float> xy(0,0);
+      std::pair<float,float> xy = numberingScheme_->getLocalCoords(cell,
+								   numberingScheme_->getCellSize(),
+								   eeSVpars_[layer][HALF_H],
+								   eeSVpars_[layer][HALF_B],
+								   eeSVpars_[layer][HALF_T]);
       int subsector=detId.subsector();
       if(subsector==0) xy.first *=-1;
 
@@ -181,7 +181,8 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       simEvt_.ee_zp[simEvt_.nee]     = detId.zside();
       simEvt_.ee_layer[simEvt_.nee]  = layer;
       simEvt_.ee_module[simEvt_.nee] = module;
-      simEvt_.ee_cell[simEvt_.nee]   = detId.subsector();
+      simEvt_.ee_subsec[simEvt_.nee]   = detId.subsector();
+      simEvt_.ee_cell[simEvt_.nee]   = detId.cell();
       simEvt_.ee_edep[simEvt_.nee]   = hit_it->energy();
       simEvt_.ee_t[simEvt_.nee]      = hit_it->time();
       simEvt_.ee_x[simEvt_.nee]      = xy.first;
