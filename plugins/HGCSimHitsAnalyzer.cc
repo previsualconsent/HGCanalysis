@@ -36,19 +36,19 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
 
   edm::Service<TFileService> fs;
   t_=fs->make<TTree>("HGC","Event Summary");
-  t_->Branch("run",      &simEvt_.run,      "run/I");
-  t_->Branch("lumi",     &simEvt_.lumi,     "lumi/I");
-  t_->Branch("event",    &simEvt_.event,    "event/I");
-  t_->Branch("nee",      &simEvt_.nee,      "nee/I");
-  t_->Branch("ee_zp",     simEvt_.ee_zp, "ee_zp[nee]/I");
-  t_->Branch("ee_layer",  simEvt_.ee_layer, "ee_layer[nee]/I");
-  t_->Branch("ee_module", simEvt_.ee_module, "ee_module[nee]/I");
+  t_->Branch("run",      &simEvt_.run,       "run/I");
+  t_->Branch("lumi",     &simEvt_.lumi,      "lumi/I");
+  t_->Branch("event",    &simEvt_.event,     "event/I");
+  t_->Branch("nee",      &simEvt_.nee,       "nee/I");
+  t_->Branch("ee_zp",     simEvt_.ee_zp,     "ee_zp[nee]/I");
+  t_->Branch("ee_layer",  simEvt_.ee_layer,  "ee_layer[nee]/I");
+  t_->Branch("ee_sec",    simEvt_.ee_sec,    "ee_sec[nee]/I");
   t_->Branch("ee_subsec", simEvt_.ee_subsec, "ee_subsec[nee]/I");
   t_->Branch("ee_cell",   simEvt_.ee_cell,   "ee_cell[nee]/I");
-  t_->Branch("ee_edep",   simEvt_.ee_edep,  "ee_edep[nee]/F");
-  t_->Branch("ee_t",      simEvt_.ee_t,     "ee_t[nee]/F");
-  t_->Branch("ee_x",      simEvt_.ee_x,     "ee_x[nee]/F");
-  t_->Branch("ee_y",      simEvt_.ee_y,     "ee_y[nee]/F");
+  t_->Branch("ee_edep",   simEvt_.ee_edep,   "ee_edep[nee]/F");
+  t_->Branch("ee_t",      simEvt_.ee_t,      "ee_t[nee]/F");
+  t_->Branch("ee_x",      simEvt_.ee_x,      "ee_x[nee]/F");
+  t_->Branch("ee_y",      simEvt_.ee_y,      "ee_y[nee]/F");
 }
 
 //
@@ -180,12 +180,12 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       int subsector=detId.subsector();
       if(subsector==0) xy.first *=-1;
 
-      int module=detId.module();
+      int sector=detId.sector();
 
       simEvt_.ee_zp[simEvt_.nee]     = detId.zside();
       simEvt_.ee_layer[simEvt_.nee]  = layer;
-      simEvt_.ee_module[simEvt_.nee] = module;
-      simEvt_.ee_subsec[simEvt_.nee]   = detId.subsector();
+      simEvt_.ee_sec[simEvt_.nee]    = sector;
+      simEvt_.ee_subsec[simEvt_.nee] = detId.subsector();
       simEvt_.ee_cell[simEvt_.nee]   = detId.cell();
       simEvt_.ee_edep[simEvt_.nee]   = hit_it->energy();
       simEvt_.ee_t[simEvt_.nee]      = hit_it->time();
@@ -199,7 +199,7 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
 // 		<< " zside=" << detId.zside() 
 // 		<< " layer=" << detId.layer() 
 // 		<< " subsec=" << detId.subsector() 
-// 		<< " module=" << detId.module()
+// 		<< " sector=" << detId.sector()
 // 		<< " cell=" << detId.cell() 
 // 		<< " | den=" << den
 // 		<< std::endl;
