@@ -9,10 +9,14 @@ process.TFileService = cms.Service("TFileService", fileName = cms.string('HGCSim
 
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 
-process.source = cms.Source("PoolSource",
+from UserCode.HGCanalysis.storeTools_cff import fillFromStore
+
+process.source = cms.Source("PoolSource",                            
                             fileNames=cms.untracked.vstring('file:particlegun.root')
                             #fileNames=cms.untracked.vstring('file:minbias.root')
                             )
+process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MinBias/v0')
+process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
 process.hgcSimHitsAnalyzer = cms.EDAnalyzer("HGCSimHitsAnalyzer",
                                             ddViewName     = cms.untracked.string(""),

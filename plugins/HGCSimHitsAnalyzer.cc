@@ -89,7 +89,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 
   simEvt_.run    = iEvent.id().run();
   simEvt_.lumi   = iEvent.luminosityBlock();
-  simEvt_.event  = iEvent.id().event();
+  simEvt_.event  = t_->GetEntriesFast()+1; //iEvent.id().event();
 
   simEvt_.nee=0;
   analyzeEEHits(caloHitsEE,genParticles);
@@ -180,6 +180,8 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       int subsector=detId.subsector();
       if(subsector==0) xy.first *=-1;
 
+      //cout << hit_it->eta() << " " << hit_it->phi() << endl;
+      
       int sector=detId.sector();
 
       simEvt_.ee_zp[simEvt_.nee]     = detId.zside();
