@@ -25,8 +25,11 @@ process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(100)
+    input = cms.untracked.int32(250)
 )
+
+process.RandomNumberGeneratorService.generator.initialSeed = cms.untracked.uint32(XXX_SEED_XXX)
+process.RandomNumberGeneratorService.mix.initialSeed = cms.untracked.uint32(XXX_SEED_XXX)
 
 # Input source
 process.source = cms.Source("EmptySource")
@@ -48,7 +51,7 @@ process.RAWSIMoutput = cms.OutputModule("PoolOutputModule",
     splitLevel = cms.untracked.int32(0),
     eventAutoFlushCompressedSize = cms.untracked.int32(5242880),
     outputCommands = process.RAWSIMEventContent.outputCommands,
-    fileName = cms.untracked.string('file:particlegun.root'),
+    fileName = cms.untracked.string('/tmp/Events_XXX_SEED_XXX.root'),
     dataset = cms.untracked.PSet(
         filterName = cms.untracked.string(''),
         dataTier = cms.untracked.string('GEN-SIM')
@@ -65,21 +68,50 @@ process.genstepfilter.triggerConditions=cms.vstring("generation_step")
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:upgradePLS3', '')
 
-process.generator = cms.EDProducer("FlatRandomPtGunProducer",
-    PGunParameters = cms.PSet(
-        MaxPt = cms.double(50.01),
-        MinPt = cms.double(49.99),
-        PartID = cms.vint32(11),
-        MaxEta = cms.double(3.0),
-        MaxPhi = cms.double(3.14159265359),
-        MinEta = cms.double(1.5),
-        MinPhi = cms.double(-3.14159265359)
-    ),
-    Verbosity = cms.untracked.int32(0),
-    psethack = cms.string('single electron pt 35'),
-    AddAntiParticle = cms.bool(False),
-    firstRun = cms.untracked.uint32(1)
-)
+process.generator = cms.EDProducer("Pythia6PtYDistGun",
+				   PGunParameters = cms.PSet( MaxY = cms.double(5),
+							      MinY = cms.double(-5),
+							      YBinning = cms.int32(500),
+							      MinPt = cms.double(5.0),
+							      MaxPt = cms.double(500.0),
+							      PtBinning = cms.int32(100000),
+							      MinPhi = cms.double(-3.1415),
+							      MaxPhi = cms.double(3.1415),
+							      ParticleID = cms.vint32(11),
+							      kinematicsFile = cms.FileInPath('UserCode/HGCanalysis/test/particle_gun_pdf.root')
+							      ),
+				   pythiaPylistVerbosity = cms.untracked.int32(1),
+				   firstRun = cms.untracked.uint32(1),
+				   Verbosity = cms.untracked.int32(0),
+				   psethack = cms.string('electron gun'),
+				   pythiaHepMCVerbosity = cms.untracked.bool(False),
+				   maxEventsToPrint = cms.untracked.int32(5),
+				   PythiaParameters = cms.PSet( pythiaUESettings = cms.vstring('MSTU(21)=1     ! Check on possible errors during program execution',
+											       'MSTJ(22)=2     ! Decay those unstable particles',
+											       'PARJ(71)=10 .  ! for which ctau  10 mm',
+											       'MSTP(33)=0     ! no K factors in hard cross sections',
+											       'MSTP(2)=1      ! which order running alphaS',
+											       'MSTP(51)=10042 ! structure function chosen (external PDF CTEQ6L1)',
+											       'MSTP(52)=2     ! work with LHAPDF',
+											       'PARP(82)=1.921 ! pt cutoff for multiparton interactions',
+											       'PARP(89)=1800. ! sqrts for which PARP82 is set',
+											       'PARP(90)=0.227 ! Multiple interactions: rescaling power',
+											       'MSTP(95)=6     ! CR (color reconnection parameters)',
+											       'PARP(77)=1.016 ! CR',
+											       'PARP(78)=0.538 ! CR',
+											       'PARP(80)=0.1   ! Prob. colored parton from BBR',
+											       'PARP(83)=0.356 ! Multiple interactions: matter distribution parameter',
+											       'PARP(84)=0.651 ! Multiple interactions: matter distribution parameter',
+											       'PARP(62)=1.025 ! ISR cutoff',
+											       'MSTP(91)=1     ! Gaussian primordial kT',
+											       'PARP(93)=10.0  ! primordial kT-max',
+											       'MSTP(81)=21    ! multiple parton interactions 1 is Pythia default',
+											       'MSTP(82)=4     ! Defines the multi-parton model'),
+								parameterSets = cms.vstring('pythiaUESettings')
+								)
+				   )
+
+
 
 
 # Path and EndPath definitions
