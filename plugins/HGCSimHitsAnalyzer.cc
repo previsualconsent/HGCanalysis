@@ -1,5 +1,7 @@
 #include "UserCode/HGCanalysis/plugins/HGCSimHitsAnalyzer.h"
 
+#include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+
 #include "DetectorDescription/OfflineDBLoader/interface/GeometryInfoDump.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
 #include "SimG4CMS/Calo/interface/CaloHitID.h"
@@ -39,6 +41,12 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   t_->Branch("run",      &simEvt_.run,       "run/I");
   t_->Branch("lumi",     &simEvt_.lumi,      "lumi/I");
   t_->Branch("event",    &simEvt_.event,     "event/I");
+  t_->Branch("ngen",     &simEvt_.ngen,      "ngen/I");
+  t_->Branch("gen_id",    simEvt_.gen_id,    "gen_id[ngen]/I");
+  t_->Branch("gen_pt",    simEvt_.gen_pt,    "gen_pt[ngen]/F");
+  t_->Branch("gen_eta",   simEvt_.gen_eta,   "gen_eta[ngen]/F");
+  t_->Branch("gen_phi",   simEvt_.gen_phi,   "gen_phi[ngen]/F");
+  t_->Branch("gen_en",    simEvt_.gen_en,    "gen_en[ngen]/F");
   t_->Branch("nee",      &simEvt_.nee,       "nee/I");
   t_->Branch("ee_zp",     simEvt_.ee_zp,     "ee_zp[nee]/I");
   t_->Branch("ee_layer",  simEvt_.ee_layer,  "ee_layer[nee]/I");
@@ -77,9 +85,23 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
     else                 { std::cout << "[HGCSimHitsAnalyzer::analyze] could not define geometry from DD view" << endl; return; }
   }
 
-  //get hits and gen level information
+  //get gen level information
   edm::Handle<edm::View<reco::Candidate> > genParticles;
   iEvent.getByLabel(edm::InputTag(genSource_), genParticles);
+  simEvt_.ngen=0;
+  for(size_t i = 0; i < genParticles->size(); ++ i)
+    {
+      const reco::GenParticle & p = dynamic_cast<const reco::GenParticle &>( (*genParticles)[i] );
+      if(p.status()!=1) continue;
+      if(abs(p.pdgId())!=11 && abs(p.pdgId())!=13) continue;
+      simEvt_.gen_id[simEvt_.ngen]=p.pdgId();
+      simEvt_.gen_pt[simEvt_.ngen]=p.pt();
+      simEvt_.gen_eta[simEvt_.ngen]=p.eta();
+      simEvt_.gen_phi[simEvt_.ngen]=p.phi();
+      simEvt_.gen_en[simEvt_.ngen]=p.energy();
+      simEvt_.ngen++;
+    }
+
 
   edm::Handle<edm::PCaloHitContainer> caloHitsEE;
   iEvent.getByLabel(edm::InputTag("g4SimHits",eeHits_),caloHitsEE); 

@@ -9,6 +9,7 @@
 <use name="CondFormats/GeometryObjects"/>
 <use name="DataFormats/ForwardDetId"/>
 <use name="DataFormats/Candidate"/>
+<use name="DataFormats/HepMCCandidate"/>
 <use name="CommonTools/UtilAlgos"/>
 <use name="geant4core"/>
 <use name="root"/>
