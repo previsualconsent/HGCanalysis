@@ -16,7 +16,8 @@ process.source = cms.Source("PoolSource",
                             #fileNames=cms.untracked.vstring('file:minbias.root')
                             )
 #process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MinBias/v0')
-process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MuonGun/v0')
+#process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MuonGun/v0')
+process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/ElectronGun/v0')
 process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
 process.hgcSimHitsAnalyzer = cms.EDAnalyzer("HGCSimHitsAnalyzer",
