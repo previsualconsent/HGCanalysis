@@ -23,6 +23,7 @@
 #include "DataFormats/ForwardDetId/interface/HGCEEDetId.h"
 #include "DataFormats/ForwardDetId/interface/HGCHEDetId.h"
 
+#include "TVector2.h"
 
 #include <iostream>
 
@@ -57,6 +58,17 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   t_->Branch("ee_t",      simEvt_.ee_t,      "ee_t[nee]/F");
   t_->Branch("ee_x",      simEvt_.ee_x,      "ee_x[nee]/F");
   t_->Branch("ee_y",      simEvt_.ee_y,      "ee_y[nee]/F");
+  t_->Branch("ee_gx",     simEvt_.ee_gx,     "ee_gx[nee]/F");
+  t_->Branch("ee_gy",     simEvt_.ee_gy,     "ee_gy[nee]/F");
+  t_->Branch("ee_gz",     simEvt_.ee_gz,     "ee_gz[nee]/F");
+  
+  eeHeightH_ = fs->make<TH1F>("eeHalfHeight",      ";Layer;Half height [mm]",       40,0.,40.);
+  eeBottomH_ = fs->make<TH1F>("eeBottomHalfWidth", ";Layer;Bottom half width [mm]", 40,0.,40.);
+  eeTopH_    = fs->make<TH1F>("eeTopHalfWidth",    ";Layer;Top half width [mm]",    40,0.,40.);
+  eeBasePhiH_= fs->make<TH1F>("eeBasePhi",         ";Layer;Baseline #phi [rad]",     40,0.,40.);
+  eeTranslXH_= fs->make<TH1F>("eeTranslX",         ";Layer;Translation X [mm]",     40,0.,40.);
+  eeTranslYH_= fs->make<TH1F>("eeTranslY",         ";Layer;Translation Y [mm]",     40,0.,40.);
+  eeTranslZH_= fs->make<TH1F>("eeTranslZ",         ";Layer;Translation Z [mm]",     40,0.,40.);
 }
 
 //
@@ -145,7 +157,6 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     return false;
   }
   numberingScheme_=new HGCNumberingScheme(gpar);
-
   
   //parse the DD for sensitive volumes
   DDExpandedView eview(cview);
@@ -157,22 +168,45 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     //only EE sensitive volumes for the moment
     if(name.find("Sensitive")==std::string::npos) continue;
     if(name.find("HGCalEE")==std::string::npos) continue;
-    
+
     size_t pos=name.find("Sensitive")+9;
     int layer=atoi(name.substr(pos,name.size()).c_str());
-   
+
     //save half height and widths for the trapezoid
     if(eeSVpars_.find(layer)!=eeSVpars_.end()) continue; 
+
+    //translation and rotation for this part
+    const DDTranslation    &transl=eview.translation();   
+    const DDRotationMatrix &rot=eview.rotation();
+    DD3Vector xrot, yrot, zrot;
+    rot.GetComponents(xrot,yrot,zrot);
+    double basePhi=TMath::ATan2(xrot.y(),xrot.x());
+  
     std::vector<double> solidPars=eview.logicalPart().solid().parameters();
-    std::cout << logPart << endl;
-    for(size_t i=0; i<solidPars.size(); i++) std::cout << solidPars[i] << " ";
-    std::cout << endl;
+    //std::cout << logPart << endl;
+    //for(size_t i=0; i<solidPars.size(); i++) std::cout << solidPars[i] << " ";
+    //std::cout << " transl=(" << transl.x() << " " << transl.y() << " " << transl.z() << ") " << std::endl;
 
     std::vector<double> layerPars;
     layerPars.push_back( solidPars[3] ); //height
     layerPars.push_back( solidPars[4] ); //bottom
     layerPars.push_back( solidPars[5] ); //top
+    layerPars.push_back( transl.x()*xrot.x()+transl.y()*xrot.y()+transl.z()*xrot.z() ); //X position before rotation
+    layerPars.push_back( transl.x()*yrot.x()+transl.y()*yrot.y()+transl.z()*yrot.z() ); //Y position before rotation
+    layerPars.push_back( transl.x()*zrot.x()+transl.y()*zrot.y()+transl.z()*zrot.z() ); //Z position before rotation
+    layerPars.push_back( basePhi );
     eeSVpars_[ layer ] = layerPars;
+
+
+
+    eeHeightH_->Fill(layer, solidPars[3] );
+    eeBottomH_->Fill(layer, solidPars[4] );
+    eeTopH_   ->Fill(layer, solidPars[5] );
+    eeTranslXH_   ->Fill(layer, layerPars[TRANSL_X] );
+    eeTranslYH_   ->Fill(layer, layerPars[TRANSL_Y] );
+    eeTranslZH_   ->Fill(layer, layerPars[TRANSL_Z] );
+    eeBasePhiH_   ->Fill(layer, layerPars[BASE_PHI] );
+
   }while(eview.next() );
 
   //all done here
@@ -201,8 +235,6 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
 								   eeSVpars_[layer][HALF_T]);
       int subsector=detId.subsector();
       if(subsector==0) xy.first *=-1;
-
-      //cout << hit_it->eta() << " " << hit_it->phi() << endl;
       
       int sector=detId.sector();
 
@@ -215,6 +247,10 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       simEvt_.ee_t[simEvt_.nee]      = hit_it->time();
       simEvt_.ee_x[simEvt_.nee]      = xy.first;
       simEvt_.ee_y[simEvt_.nee]      = xy.second;
+      float gx(eeSVpars_[layer][TRANSL_X]+xy.first*simEvt_.ee_subsec[simEvt_.nee]), gy(eeSVpars_[layer][TRANSL_Y]+xy.second), phi(TVector2::Phi_mpi_pi(sector*TMath::Pi()/9-eeSVpars_[layer][BASE_PHI]));
+      simEvt_.ee_gx[simEvt_.nee]     = TMath::Cos(phi)*gx-TMath::Sin(phi)*gy;
+      simEvt_.ee_gy[simEvt_.nee]     = TMath::Sin(phi)*gx+TMath::Cos(phi)*gy;
+      simEvt_.ee_gz[simEvt_.nee]     = eeSVpars_[layer][TRANSL_Z]*simEvt_.ee_zp[simEvt_.nee];
       simEvt_.nee++;
 
 //       std::cout << hex << "0x" << uint32_t(detId) << dec 

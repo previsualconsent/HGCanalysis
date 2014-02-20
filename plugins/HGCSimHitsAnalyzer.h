@@ -19,7 +19,7 @@
 
 #include "UserCode/HGCanalysis/interface/HGCSimulationEvent.h"
 
-
+#include "TH1F.h"
 #include "TTree.h"
 
 #include <string>
@@ -52,8 +52,10 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
 
   TTree *t_;
   HGCSimEvent_t simEvt_;
+  TH1F *eeHeightH_,*eeBottomH_,*eeTopH_;
+  TH1F *eeTranslXH_, *eeTranslYH_, *eeTranslZH_, *eeBasePhiH_;
 
-  enum SVPars { HALF_H, HALF_B, HALF_T };
+  enum SVPars { HALF_H, HALF_B, HALF_T, TRANSL_X, TRANSL_Y, TRANSL_Z, BASE_PHI };
   std::map<int, std::vector<double> > eeSVpars_;
 };
  

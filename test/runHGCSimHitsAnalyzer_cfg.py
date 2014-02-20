@@ -7,7 +7,7 @@ process.load('Configuration.StandardSequences.MagneticField_38T_cff')
 
 process.TFileService = cms.Service("TFileService", fileName = cms.string('HGCSimHitsAnalysis.root') )
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10) )
 
 from UserCode.HGCanalysis.storeTools_cff import fillFromStore
 
