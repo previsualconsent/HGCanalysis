@@ -2,7 +2,7 @@
 # using: 
 # Revision: 1.20 
 # Source: /local/reps/CMSSW/CMSSW/Configuration/Applications/python/ConfigBuilder.py,v 
-# with command line options: SingleElectronPt35_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 10 --relval 9000,100 --eventcontent RAWSIM --geometry Extended2023HGCal --conditions auto:upgradePLS3 --fileout file:singleele_pt35.root
+# with command line options: SingleElectronPt35_cfi --conditions auto:startup -s GEN,SIM --datatier GEN-SIM -n 10 --relval 9000,100 --eventcontent RAWSIM --geometry Extended2023HGCalMuon --conditions auto:upgradePLS3 --fileout file:singleele_pt35.root
 import FWCore.ParameterSet.Config as cms
 
 process = cms.Process('SIM')
@@ -13,9 +13,8 @@ process.load('SimGeneral.HepPDTESSource.pythiapdt_cfi')
 process.load('FWCore.MessageService.MessageLogger_cfi')
 process.load('Configuration.EventContent.EventContent_cff')
 process.load('SimGeneral.MixingModule.mixNoPU_cfi')
-#process.load('Configuration.StandardSequences.GeometryRecoDB_cff')
-process.load('Configuration.Geometry.GeometryExtended2023Reco_cff')
-process.load('Configuration.Geometry.GeometryExtended2023HGCal_cff')
+process.load('Configuration.Geometry.GeometryExtended2023HGCalMuonReco_cff')
+process.load('Configuration.Geometry.GeometryExtended2023HGCalMuon_cff')
 process.load('Configuration.StandardSequences.MagneticField_38T_cff')
 process.load('Configuration.StandardSequences.Generator_cff')
 process.load('IOMC.EventVertexGenerators.VtxSmearedRealistic8TeVCollision_cfi')
@@ -71,13 +70,13 @@ process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:upgradePLS3', '')
 process.generator = cms.EDProducer("Pythia6PtYDistGun",
 				   PGunParameters = cms.PSet( MaxY = cms.double(5),
 							      MinY = cms.double(-5),
-							      YBinning = cms.int32(500),
+							      YBinning = cms.int32(100),
 							      MinPt = cms.double(5.0),
 							      MaxPt = cms.double(500.0),
-							      PtBinning = cms.int32(100000),
+							      PtBinning = cms.int32(500),
 							      MinPhi = cms.double(-3.1415),
 							      MaxPhi = cms.double(3.1415),
-							      ParticleID = cms.vint32(1),
+							      ParticleID = cms.vint32(11),
 							      kinematicsFile = cms.FileInPath('UserCode/HGCanalysis/test/particle_gun_pdf.root')
 							      ),
 				   pythiaPylistVerbosity = cms.untracked.int32(1),
