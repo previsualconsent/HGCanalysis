@@ -18,7 +18,7 @@ process.source = cms.Source("PoolSource",
 #process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MinBias/v0')
 #process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MuonGun/v0')
 #process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/SingleElectron/v1')
-process.source.fileNames=cms.untracked.vstring('file:/tmp/Events_1.root')
+process.source.fileNames=cms.untracked.vstring('file:/afs/cern.ch/user/p/psilva/work/CMSSW_6_2_0_SLHC8/src/Events_413.root')
 process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
 print process.source.fileNames

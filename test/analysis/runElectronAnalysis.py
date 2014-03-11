@@ -25,8 +25,8 @@ loops over the events and collects the electron energies
 def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
 
     customROOTstyle()
-    gROOT.SetBatch(True)
-    #gROOT.SetBatch(False)
+    #gROOT.SetBatch(True)
+    gROOT.SetBatch(False)
     gStyle.SetPalette(56)
 
     #prepare the output
@@ -52,7 +52,7 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
     fin=TFile.Open(url)
     Events=fin.Get(treeName)
     eeBottomHalfWidth = fin.Get('hgcSimHitsAnalyzer/eeBottomHalfWidth')
-    baseOverburden=1*[0.21]+10*[0.5]+10*[0.8]+10*[1.2]
+    #baseOverburden=1*[0.21]+10*[0.5]+10*[0.8]+10*[1.2]
     for iev in xrange(0,Events.GetEntriesFast()) :
 
         #some printout to know where we are
@@ -70,9 +70,10 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
         genPt=Events.gen_pt[0]
         genEta=abs(Events.gen_eta[0])
         genPhi=abs(Events.gen_phi[0])
-        thicknessSF=getThicknessCorrectionForEta(genEta)
-        localOverburden=[x0*thicknessSF for x0 in baseOverburden]
-
+        #thicknessSF=getThicknessCorrectionForEta(genEta)
+        #localOverburden=[x0*thicknessSF for x0 in baseOverburden]
+        localOverburden=100*[1.0]
+        
         #get energy deposits info for ECAL
         if Events.nee==0 : continue
         edeps=len(localOverburden)*[0]
@@ -82,8 +83,6 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
             if edep<1 : continue
             layer=Events.ee_layer[idep]
             edeps[ layer-1 ] += edep
-
-            continue
         
             #check in eta-phi
             gx=Events.ee_gx[idep]
@@ -93,16 +92,19 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
             p4=TLorentzVector(gx,gy,gz,radius)
             phi=p4.Phi()
             eta=p4.Eta()
-            etaPhiDisplay.Fill(eta,phi,edep*localOverburden[Events.ee_layer[idep]-1]/localOverburden[0])
+            #print phi,ROOT.TMath.ATan2(gy,gx)
+            etaPhiDisplay.Fill(eta,phi,edep)
+
+            continue
 
             #select around the electron a eta-phi square
-            deta=eta-genEta
-            dphi=TVector2.Phi_mpi_pi(phi-genPhi)
+            #deta=eta-genEta
+            #dphi=TVector2.Phi_mpi_pi(phi-genPhi)
             #print deta,dphi
-            if TMath.Abs(deta)>0.5 or TMath.Abs(dphi)>1.5 : continue
-            if not layer in edeps_etaphi:
-                edeps_etaphi[layer]=[]
-            edeps_etaphi[layer].append([deta,dphi,edep])
+            #if TMath.Abs(deta)>0.5 or TMath.Abs(dphi)>1.5 : continue
+            #if not layer in edeps_etaphi:
+            #    edeps_etaphi[layer]=[]
+            #edeps_etaphi[layer].append([deta,dphi,edep])
 
 
         #overlay the pileup
@@ -121,7 +123,7 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
                     p4=TLorentzVector(gx,gy,gz,radius)
                     phi=p4.Phi()
                     eta=p4.Eta()
-                    etaPhiDisplay.Fill(eta,phi,edep*localOverburden[mbEvents.ee_layer[idep]-1]/localOverburden[0])
+                    etaPhiDisplay.Fill(eta,phi,edep) #*localOverburden[mbEvents.ee_layer[idep]-1]/localOverburden[0])
 
                     #select around the electron a eta-phi square
                     deta=eta-genEta
@@ -140,11 +142,20 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
         ele.buildLongitudinalProfile(iev>10 and iev<20)
         #ele.setTransverseProfile(edeps_etaphi)
         #ele.buildTransverseProfile(iev<10)
-
+        
         if iev<10:
             c=ROOT.TCanvas('c','c',500,500)
             c.SetTopMargin(0.05)
             etaPhiDisplay.Draw('lego2fb 0')
+
+            phietaLine=ROOT.TPolyLine3D(3)
+            phietaLine.SetPoint(0,genEta,-3.2,0)
+            phietaLine.SetPoint(1,genEta,genPhi,0)
+            phietaLine.SetPoint(2,-5,genPhi,0)
+            phietaLine.SetLineStyle(9)
+            phietaLine.SetLineWidth(2)
+            phietaLine.Draw('same')
+
             #c.SetRightMargin(0.15)
             #etaPhiDisplay.Draw('colz')
             #etaPhiDisplay.GetZaxis().SetRangeUser(1,2e4)
@@ -164,7 +175,7 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
             c.Modified()
             c.Update()
             c.SaveAs('cmssw_%d_pu%d.png'%(iev,nPU))
-            
+            raw_input()
         etaPhiDisplay.Reset('ICE')
        
 

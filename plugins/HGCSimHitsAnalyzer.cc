@@ -62,13 +62,13 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   t_->Branch("ee_gy",     simEvt_.ee_gy,     "ee_gy[nee]/F");
   t_->Branch("ee_gz",     simEvt_.ee_gz,     "ee_gz[nee]/F");
   
-  eeHeightH_ = fs->make<TH1F>("eeHalfHeight",      ";Layer;Half height [mm]",       40,0.,40.);
-  eeBottomH_ = fs->make<TH1F>("eeBottomHalfWidth", ";Layer;Bottom half width [mm]", 40,0.,40.);
-  eeTopH_    = fs->make<TH1F>("eeTopHalfWidth",    ";Layer;Top half width [mm]",    40,0.,40.);
-  eeBasePhiH_= fs->make<TH1F>("eeBasePhi",         ";Layer;Baseline #phi [rad]",     40,0.,40.);
-  eeTranslXH_= fs->make<TH1F>("eeTranslX",         ";Layer;Translation X [mm]",     40,0.,40.);
-  eeTranslYH_= fs->make<TH1F>("eeTranslY",         ";Layer;Translation Y [mm]",     40,0.,40.);
-  eeTranslZH_= fs->make<TH1F>("eeTranslZ",         ";Layer;Translation Z [mm]",     40,0.,40.);
+  eeHeightH_ = fs->make<TH1F>("eeHalfHeight",      ";Layer;Half height [mm]",       400,-200.,200.);
+  eeBottomH_ = fs->make<TH1F>("eeBottomHalfWidth", ";Layer;Bottom half width [mm]", 400,-200.,200.);
+  eeTopH_    = fs->make<TH1F>("eeTopHalfWidth",    ";Layer;Top half width [mm]",    400,-200.,200.);
+  eeBasePhiH_= fs->make<TH1F>("eeBasePhi",         ";Layer;Baseline #phi [rad]",    400,-200.,200.);
+  eeTranslXH_= fs->make<TH1F>("eeTranslX",         ";Layer;Translation X [mm]",     400,-200.,200.);
+  eeTranslYH_= fs->make<TH1F>("eeTranslY",         ";Layer;Translation Y [mm]",     400,-200.,200.);
+  eeTranslZH_= fs->make<TH1F>("eeTranslZ",         ";Layer;Translation Z [mm]",     400,-200.,200.);
 }
 
 //
@@ -179,8 +179,12 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     rot.GetComponents(xrot,yrot,zrot);
     double basePhi=TMath::ATan2(xrot.y(),xrot.x());  
 
+    //set key to -1 if in negative z axis
+    int layerKey(layer);
+    if( transl.z()<0 ) layerKey *= -1;
+
     //save half height and widths for the trapezoid
-    if(eeSVpars_.find(layer)==eeSVpars_.end()) 
+    if(eeSVpars_.find(layerKey)==eeSVpars_.end()) 
       {
 	std::vector<double> solidPars=eview.logicalPart().solid().parameters();
 	std::vector<double> layerPars;
@@ -190,20 +194,21 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 	layerPars.push_back( transl.x()*xrot.x()+transl.y()*xrot.y()+transl.z()*xrot.z() ); //X position before rotation
 	layerPars.push_back( transl.x()*yrot.x()+transl.y()*yrot.y()+transl.z()*yrot.z() ); //Y position before rotation
 	layerPars.push_back( transl.x()*zrot.x()+transl.y()*zrot.y()+transl.z()*zrot.z() ); //Z position before rotation
-	layerPars.push_back( basePhi );
-	eeSVpars_[ layer ] = layerPars;
+	eeSVpars_[ layerKey ] = layerPars;
+	std::vector<double> phiPars(1,basePhi); //rotation in phi
+	eeSVphi_[layerKey]=phiPars;
 	
-	eeHeightH_->Fill(layer, solidPars[3] );
-	eeBottomH_->Fill(layer, solidPars[4] );
-	eeTopH_   ->Fill(layer, solidPars[5] );
-	eeTranslXH_   ->Fill(layer, layerPars[TRANSL_X] );
-	eeTranslYH_   ->Fill(layer, layerPars[TRANSL_Y] );
-	eeTranslZH_   ->Fill(layer, layerPars[TRANSL_Z] );
-	eeBasePhiH_   ->Fill(layer, layerPars[BASE_PHI] );
+	eeHeightH_->Fill(layerKey, solidPars[3] );
+	eeBottomH_->Fill(layerKey, solidPars[4] );
+	eeTopH_   ->Fill(layerKey, solidPars[5] );
+	eeTranslXH_   ->Fill(layerKey, layerPars[TRANSL_X] );
+	eeTranslYH_   ->Fill(layerKey, layerPars[TRANSL_Y] );
+	eeTranslZH_   ->Fill(layerKey, layerPars[TRANSL_Z] );
+	eeBasePhiH_   ->Fill(layerKey, basePhi);
       }
     else
       {
-	eeSVpars_[ layer ].push_back(basePhi);
+	eeSVphi_[ layerKey ].push_back(basePhi);
       }
 
   }while(eview.next() );
@@ -221,8 +226,12 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       HGCEEDetId detId(hit_it->id());
 
       int layer=detId.layer();
-      std::cout << detId << std::endl;
-      if(eeSVpars_.find(layer) == eeSVpars_.end()){
+      int zpos=detId.zside();
+
+      int layerKey(layer);
+      if(zpos<0) layerKey *= -1;
+
+      if(eeSVpars_.find(layerKey) == eeSVpars_.end()){
 	std::cout << "[HGCSimHitsAnalyzer][analyzeEEHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << std::endl;
 	std::cout << detId << std::endl;
 	continue;
@@ -231,15 +240,15 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       int cell=detId.cell();
       std::pair<float,float> xy = numberingScheme_->getLocalCoords(cell,
 								   numberingScheme_->getCellSize(),
-								   eeSVpars_[layer][HALF_H],
-								   eeSVpars_[layer][HALF_B],
-								   eeSVpars_[layer][HALF_T]);
+								   eeSVpars_[layerKey][HALF_H],
+								   eeSVpars_[layerKey][HALF_B],
+								   eeSVpars_[layerKey][HALF_T]);
       int subsector=detId.subsector();
       if(subsector==0) xy.first *=-1;
       
       int sector=detId.sector();
 
-      simEvt_.ee_zp[simEvt_.nee]     = detId.zside();
+      simEvt_.ee_zp[simEvt_.nee]     = zpos;
       simEvt_.ee_layer[simEvt_.nee]  = layer;
       simEvt_.ee_sec[simEvt_.nee]    = sector;
       simEvt_.ee_subsec[simEvt_.nee] = detId.subsector();
@@ -248,22 +257,17 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       simEvt_.ee_t[simEvt_.nee]      = hit_it->time();
       simEvt_.ee_x[simEvt_.nee]      = xy.first;
       simEvt_.ee_y[simEvt_.nee]      = xy.second;
-      float gx(eeSVpars_[layer][TRANSL_X]+xy.first*simEvt_.ee_subsec[simEvt_.nee]), gy(eeSVpars_[layer][TRANSL_Y]+xy.second), phi(TVector2::Phi_mpi_pi(sector*TMath::Pi()/9-eeSVpars_[layer][BASE_PHI]));
+      float gx(eeSVpars_[layerKey][TRANSL_X]+xy.first*simEvt_.ee_subsec[simEvt_.nee]), gy(eeSVpars_[layerKey][TRANSL_Y]+xy.second);
+      float phi(0);
+      if(eeSVphi_[layerKey].size()<(size_t)sector)
+	std::cout << "[HGCSimHitsAnalyzer][analyzeEEHits] can't find base phi for sector #" << sector << " @ layer #" << layerKey << std::endl
+		  << "\t Expecting max. " << eeSVphi_[layerKey].size() << " sub-sectors" << std::endl;
+      else
+	phi=eeSVphi_[layerKey][sector];
       simEvt_.ee_gx[simEvt_.nee]     = TMath::Cos(phi)*gx-TMath::Sin(phi)*gy;
       simEvt_.ee_gy[simEvt_.nee]     = TMath::Sin(phi)*gx+TMath::Cos(phi)*gy;
-      simEvt_.ee_gz[simEvt_.nee]     = eeSVpars_[layer][TRANSL_Z]*simEvt_.ee_zp[simEvt_.nee];
+      simEvt_.ee_gz[simEvt_.nee]     = eeSVpars_[layerKey][TRANSL_Z];
       simEvt_.nee++;
-
-//       std::cout << hex << "0x" << uint32_t(detId) << dec 
-// 		<< " | isFwd=" << detId.isForward()
-// 		<< " isEE=" << detId.isEE() 
-// 		<< " zside=" << detId.zside() 
-// 		<< " layer=" << detId.layer() 
-// 		<< " subsec=" << detId.subsector() 
-// 		<< " sector=" << detId.sector()
-// 		<< " cell=" << detId.cell() 
-// 		<< " | den=" << den
-// 		<< std::endl;
     }
 }
 

@@ -55,8 +55,8 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   TH1F *eeHeightH_,*eeBottomH_,*eeTopH_;
   TH1F *eeTranslXH_, *eeTranslYH_, *eeTranslZH_, *eeBasePhiH_;
 
-  enum SVPars { HALF_H, HALF_B, HALF_T, TRANSL_X, TRANSL_Y, TRANSL_Z, BASE_PHI };
-  std::map<int, std::vector<double> > eeSVpars_;
+  enum SVPars { HALF_H, HALF_B, HALF_T, TRANSL_X, TRANSL_Y, TRANSL_Z};
+  std::map<int, std::vector<double> > eeSVpars_, eeSVphi_;
 };
  
 
