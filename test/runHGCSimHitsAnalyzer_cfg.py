@@ -7,7 +7,7 @@ process.load('Configuration.StandardSequences.MagneticField_38T_cff')
 
 process.TFileService = cms.Service("TFileService", fileName = cms.string('HGCSimHitsAnalysis.root') )
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 
 from UserCode.HGCanalysis.storeTools_cff import fillFromStore
 
@@ -17,8 +17,11 @@ process.source = cms.Source("PoolSource",
                             )
 #process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MinBias/v0')
 #process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MuonGun/v0')
-process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/ElectronGun/v0')
+#process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/SingleElectron/v1')
+process.source.fileNames=cms.untracked.vstring('file:/tmp/Events_1.root')
 process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
+
+print process.source.fileNames
 
 process.hgcSimHitsAnalyzer = cms.EDAnalyzer("HGCSimHitsAnalyzer",
                                             ddViewName     = cms.untracked.string(""),

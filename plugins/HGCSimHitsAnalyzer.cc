@@ -167,45 +167,44 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 
     //only EE sensitive volumes for the moment
     if(name.find("Sensitive")==std::string::npos) continue;
-    if(name.find("HGCalEE")==std::string::npos) continue;
+    if(name.find("EE")==std::string::npos) continue;
 
     size_t pos=name.find("Sensitive")+9;
     int layer=atoi(name.substr(pos,name.size()).c_str());
-
-    //save half height and widths for the trapezoid
-    if(eeSVpars_.find(layer)!=eeSVpars_.end()) continue; 
 
     //translation and rotation for this part
     const DDTranslation    &transl=eview.translation();   
     const DDRotationMatrix &rot=eview.rotation();
     DD3Vector xrot, yrot, zrot;
     rot.GetComponents(xrot,yrot,zrot);
-    double basePhi=TMath::ATan2(xrot.y(),xrot.x());
-  
-    std::vector<double> solidPars=eview.logicalPart().solid().parameters();
-    //std::cout << logPart << endl;
-    //for(size_t i=0; i<solidPars.size(); i++) std::cout << solidPars[i] << " ";
-    //std::cout << " transl=(" << transl.x() << " " << transl.y() << " " << transl.z() << ") " << std::endl;
+    double basePhi=TMath::ATan2(xrot.y(),xrot.x());  
 
-    std::vector<double> layerPars;
-    layerPars.push_back( solidPars[3] ); //height
-    layerPars.push_back( solidPars[4] ); //bottom
-    layerPars.push_back( solidPars[5] ); //top
-    layerPars.push_back( transl.x()*xrot.x()+transl.y()*xrot.y()+transl.z()*xrot.z() ); //X position before rotation
-    layerPars.push_back( transl.x()*yrot.x()+transl.y()*yrot.y()+transl.z()*yrot.z() ); //Y position before rotation
-    layerPars.push_back( transl.x()*zrot.x()+transl.y()*zrot.y()+transl.z()*zrot.z() ); //Z position before rotation
-    layerPars.push_back( basePhi );
-    eeSVpars_[ layer ] = layerPars;
-
-
-
-    eeHeightH_->Fill(layer, solidPars[3] );
-    eeBottomH_->Fill(layer, solidPars[4] );
-    eeTopH_   ->Fill(layer, solidPars[5] );
-    eeTranslXH_   ->Fill(layer, layerPars[TRANSL_X] );
-    eeTranslYH_   ->Fill(layer, layerPars[TRANSL_Y] );
-    eeTranslZH_   ->Fill(layer, layerPars[TRANSL_Z] );
-    eeBasePhiH_   ->Fill(layer, layerPars[BASE_PHI] );
+    //save half height and widths for the trapezoid
+    if(eeSVpars_.find(layer)==eeSVpars_.end()) 
+      {
+	std::vector<double> solidPars=eview.logicalPart().solid().parameters();
+	std::vector<double> layerPars;
+	layerPars.push_back( solidPars[3] ); //height
+	layerPars.push_back( solidPars[4] ); //bottom
+	layerPars.push_back( solidPars[5] ); //top
+	layerPars.push_back( transl.x()*xrot.x()+transl.y()*xrot.y()+transl.z()*xrot.z() ); //X position before rotation
+	layerPars.push_back( transl.x()*yrot.x()+transl.y()*yrot.y()+transl.z()*yrot.z() ); //Y position before rotation
+	layerPars.push_back( transl.x()*zrot.x()+transl.y()*zrot.y()+transl.z()*zrot.z() ); //Z position before rotation
+	layerPars.push_back( basePhi );
+	eeSVpars_[ layer ] = layerPars;
+	
+	eeHeightH_->Fill(layer, solidPars[3] );
+	eeBottomH_->Fill(layer, solidPars[4] );
+	eeTopH_   ->Fill(layer, solidPars[5] );
+	eeTranslXH_   ->Fill(layer, layerPars[TRANSL_X] );
+	eeTranslYH_   ->Fill(layer, layerPars[TRANSL_Y] );
+	eeTranslZH_   ->Fill(layer, layerPars[TRANSL_Z] );
+	eeBasePhiH_   ->Fill(layer, layerPars[BASE_PHI] );
+      }
+    else
+      {
+	eeSVpars_[ layer ].push_back(basePhi);
+      }
 
   }while(eview.next() );
 
@@ -222,9 +221,11 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       HGCEEDetId detId(hit_it->id());
 
       int layer=detId.layer();
+      std::cout << detId << std::endl;
       if(eeSVpars_.find(layer) == eeSVpars_.end()){
 	std::cout << "[HGCSimHitsAnalyzer][analyzeEEHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << std::endl;
-	//continue;
+	std::cout << detId << std::endl;
+	continue;
       }
       
       int cell=detId.cell();

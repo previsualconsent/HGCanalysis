@@ -25,12 +25,12 @@ loops over the events and collects the electron energies
 def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
 
     customROOTstyle()
-    #    gROOT.SetBatch(True)
-    gROOT.SetBatch(False)
+    gROOT.SetBatch(True)
+    #gROOT.SetBatch(False)
     gStyle.SetPalette(56)
 
     #prepare the output
-    fout=TFile.Open('ElectronAnalyis.root','RECREATE')
+    fout=TFile.Open('ElectronAnalysis.root','RECREATE')
     fout.cd()
     output_tuple = TNtuple("etuple","etuple","en:pt:eta:sumEn:sumWEn:fitEn")
     output_tuple.SetDirectory(fout)
@@ -41,14 +41,18 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
 
     #open the minimum bias to overlay
     mbfin=TFile.Open(mbUrl)
-    mbEvents=mbfin.Get(treeName)
-    mbEvRanges=generateInTimePUSets(mbEvents.GetEntriesFast(),nPU)
+    try:
+        mbEvents=mbfin.Get(treeName)
+        mbEvRanges=generateInTimePUSets(mbEvents.GetEntriesFast(),nPU)
+    except:
+        nPU=0
+        print 'No minbias events will be mixed'
 
     #analyze generated events
     fin=TFile.Open(url)
     Events=fin.Get(treeName)
     eeBottomHalfWidth = fin.Get('hgcSimHitsAnalyzer/eeBottomHalfWidth')
-    baseOverburden=10*[0.5]+10*[0.8]+10*[1.2]
+    baseOverburden=1*[0.21]+10*[0.5]+10*[0.8]+10*[1.2]
     for iev in xrange(0,Events.GetEntriesFast()) :
 
         #some printout to know where we are
@@ -79,6 +83,8 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
             layer=Events.ee_layer[idep]
             edeps[ layer-1 ] += edep
 
+            continue
+        
             #check in eta-phi
             gx=Events.ee_gx[idep]
             gy=Events.ee_gy[idep]
@@ -92,7 +98,7 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
             #select around the electron a eta-phi square
             deta=eta-genEta
             dphi=TVector2.Phi_mpi_pi(phi-genPhi)
-            print deta,dphi
+            #print deta,dphi
             if TMath.Abs(deta)>0.5 or TMath.Abs(dphi)>1.5 : continue
             if not layer in edeps_etaphi:
                 edeps_etaphi[layer]=[]
@@ -102,7 +108,7 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
         #overlay the pileup
         if nPU>0:
             idxToOverlay=ROOT.gRandom.Uniform(0,len(mbEvRanges))
-            print 'overlaying ',mbEvRanges[idxToOverlay][0],mbEvRanges[idxToOverlay][1]+1
+            #print 'overlaying ',mbEvRanges[idxToOverlay][0],mbEvRanges[idxToOverlay][1]+1
             for imbev in xrange(mbEvRanges[idxToOverlay][0],mbEvRanges[idxToOverlay][1]+1):
                 mbEvents.GetEntry(imbev)
                 for idep in xrange(0,mbEvents.nee):
@@ -126,14 +132,14 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
                     edeps_etaphi[layer].append([deta,dphi,edep])
 
 
-        print edeps_etaphi
+        #print edeps_etaphi
         #build the electron candidate
         ele=ElectronCandidate()
         ele.setGeneratorLevelInfo(genEn,genPt,genEta)
         ele.setLongitudinalProfile(edeps,localOverburden)
         ele.buildLongitudinalProfile(iev>10 and iev<20)
-        ele.setTransverseProfile(edeps_etaphi)
-        ele.buildTransverseProfile(iev<10)
+        #ele.setTransverseProfile(edeps_etaphi)
+        #ele.buildTransverseProfile(iev<10)
 
         if iev<10:
             c=ROOT.TCanvas('c','c',500,500)

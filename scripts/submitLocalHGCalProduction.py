@@ -3,21 +3,23 @@
 import os,sys
 import optparse
 import commands
+import time
 
 
 usage = 'usage: %prog [options]'
 parser = optparse.OptionParser(usage)
-parser.add_option('-q', '--queue'      ,    dest='queue'              , help='batch queue'                 , default='1nh')
-parser.add_option('-n', '--njobs'      ,    dest='njobs'              , help='number of jobs'              , default=1,  type=int)
-parser.add_option('-o', '--out'        ,    dest='output'             , help='output directory'            , default='/store/cmst3/group/hgcal/CMSSW/MinBias')
-parser.add_option('-c', '--cfg'        ,    dest='cfg'                , help='cfg file'                    , default='test/runMinBias_GEN_SIM_cfg.py')
+parser.add_option('-q', '--queue'      ,    dest='queue'              , help='batch queue'                                        , default='1nh')
+parser.add_option('-n', '--njobs'      ,    dest='njobs'              , help='number of jobs'                                     , default=1,  type=int)
+parser.add_option('-o', '--out'        ,    dest='output'             , help='output directory'                                   , default='/store/cmst3/group/hgcal/CMSSW/MinBias')
+parser.add_option('-c', '--cfg'        ,    dest='cfg'                , help='cfg file'                                           , default='test/runMinBias_GEN_SIM_cfg.py')
+parser.add_option('-r', '--rep'        ,    dest='customReplacements' , help='sed replacements for cfg  key1:val1,key2:val2,...'  , default=None)
 (opt, args) = parser.parse_args()
 
 
 #prepare output
 os.system('cmsMkdir %s'%opt.output)
 cmsswBase=os.environ['CMSSW_BASE']
-jobsDir=cmsswBase+'/src/FARM'
+jobsDir=cmsswBase+'/src/FARM%s'%(time.time())
 os.system('mkdir -p %s'%jobsDir)
 
 def replfunc(match):
@@ -33,9 +35,14 @@ for n in xrange(0,opt.njobs):
     inCfg = open(opt.cfg).read()
     outCfg = open('%s/cmssw_%d_cfg.py'%(jobsDir,jobSeed), 'w')
     replacements = {'XXX_SEED_XXX':str(jobSeed)}
+    if opt.customReplacements is not None:
+        for rep in opt.customReplacements.split(','):
+            repKeys=rep.split(':')
+            replacements[repKeys[0]]=repKeys[1]
+    
     for i in replacements.keys():
         inCfg = inCfg.replace(i, replacements[i])
-        outCfg.write(inCfg)
+    outCfg.write(inCfg)
     outCfg.close()
     
     #create a wrapper for standalone cmssw job

@@ -76,7 +76,7 @@ process.generator = cms.EDProducer("Pythia6PtYDistGun",
 							      PtBinning = cms.int32(500),
 							      MinPhi = cms.double(-3.1415),
 							      MaxPhi = cms.double(3.1415),
-							      ParticleID = cms.vint32(11),
+							      ParticleID = cms.vint32(XXX_PID_XXX),
 							      kinematicsFile = cms.FileInPath('UserCode/HGCanalysis/test/particle_gun_pdf.root')
 							      ),
 				   pythiaPylistVerbosity = cms.untracked.int32(1),
