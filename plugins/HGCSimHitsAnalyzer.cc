@@ -173,12 +173,15 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     int layer=atoi(name.substr(pos,name.size()).c_str());
 
     //translation and rotation for this part
-    const DDTranslation    &transl=eview.translation();   
-    const DDRotationMatrix &rot=eview.rotation();
+    //note that the inverse rotation matrix elements are:
+    //[xrot^T yrot^T zrot^T]
+    //cf. http://root.cern.ch/root/html/src/ROOT__Math__Rotation3D.h.html#twSZND
+    DDTranslation transl=eview.translation();
+    DDRotationMatrix rot=eview.rotation();
     DD3Vector xrot, yrot, zrot;
     rot.GetComponents(xrot,yrot,zrot);
-    double basePhi=TMath::ATan2(xrot.y(),xrot.x());  
-
+    double basePhi=TMath::ATan2(-yrot.x(),xrot.x());
+    
     //set key to -1 if in negative z axis
     int layerKey(layer);
     if( transl.z()<0 ) layerKey *= -1;
@@ -195,22 +198,22 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 	layerPars.push_back( transl.x()*yrot.x()+transl.y()*yrot.y()+transl.z()*yrot.z() ); //Y position before rotation
 	layerPars.push_back( transl.x()*zrot.x()+transl.y()*zrot.y()+transl.z()*zrot.z() ); //Z position before rotation
 	eeSVpars_[ layerKey ] = layerPars;
-	std::vector<double> phiPars(1,basePhi); //rotation in phi
+	std::vector<double> phiPars(1,basePhi);
 	eeSVphi_[layerKey]=phiPars;
-	
-	eeHeightH_->Fill(layerKey, solidPars[3] );
-	eeBottomH_->Fill(layerKey, solidPars[4] );
-	eeTopH_   ->Fill(layerKey, solidPars[5] );
-	eeTranslXH_   ->Fill(layerKey, layerPars[TRANSL_X] );
-	eeTranslYH_   ->Fill(layerKey, layerPars[TRANSL_Y] );
-	eeTranslZH_   ->Fill(layerKey, layerPars[TRANSL_Z] );
-	eeBasePhiH_   ->Fill(layerKey, basePhi);
+ 		
+ 	eeHeightH_->Fill(layerKey, solidPars[3] );
+ 	eeBottomH_->Fill(layerKey, solidPars[4] );
+ 	eeTopH_   ->Fill(layerKey, solidPars[5] );
+ 	eeTranslXH_   ->Fill(layerKey, layerPars[TRANSL_X] );
+ 	eeTranslYH_   ->Fill(layerKey, layerPars[TRANSL_Y] );
+ 	eeTranslZH_   ->Fill(layerKey, layerPars[TRANSL_Z] );
+ 	eeBasePhiH_   ->Fill(layerKey, basePhi);
       }
     else
       {
 	eeSVphi_[ layerKey ].push_back(basePhi);
       }
-
+    
   }while(eview.next() );
 
   //all done here
@@ -248,16 +251,25 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       
       int sector=detId.sector();
 
+      //det id info
       simEvt_.ee_zp[simEvt_.nee]     = zpos;
       simEvt_.ee_layer[simEvt_.nee]  = layer;
       simEvt_.ee_sec[simEvt_.nee]    = sector;
       simEvt_.ee_subsec[simEvt_.nee] = detId.subsector();
       simEvt_.ee_cell[simEvt_.nee]   = detId.cell();
+
+      //energy
       simEvt_.ee_edep[simEvt_.nee]   = hit_it->energy();
+
+      //time
       simEvt_.ee_t[simEvt_.nee]      = hit_it->time();
+
+      //local coordinates (relative to the center of the sensitive detector)
       simEvt_.ee_x[simEvt_.nee]      = xy.first;
       simEvt_.ee_y[simEvt_.nee]      = xy.second;
-      float gx(eeSVpars_[layerKey][TRANSL_X]+xy.first*simEvt_.ee_subsec[simEvt_.nee]), gy(eeSVpars_[layerKey][TRANSL_Y]+xy.second);
+
+      //global coordinates (translate+rotate x and y)
+      float gx(eeSVpars_[layerKey][TRANSL_X]+xy.first), gy(eeSVpars_[layerKey][TRANSL_Y]+xy.second);
       float phi(0);
       if(eeSVphi_[layerKey].size()<(size_t)sector)
 	std::cout << "[HGCSimHitsAnalyzer][analyzeEEHits] can't find base phi for sector #" << sector << " @ layer #" << layerKey << std::endl
@@ -267,6 +279,8 @@ void HGCSimHitsAnalyzer::analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &calo
       simEvt_.ee_gx[simEvt_.nee]     = TMath::Cos(phi)*gx-TMath::Sin(phi)*gy;
       simEvt_.ee_gy[simEvt_.nee]     = TMath::Sin(phi)*gx+TMath::Cos(phi)*gy;
       simEvt_.ee_gz[simEvt_.nee]     = eeSVpars_[layerKey][TRANSL_Z];
+
+      //increment array
       simEvt_.nee++;
     }
 }

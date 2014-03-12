@@ -68,8 +68,8 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
         if abs(id) != 11 : continue
         genEn=Events.gen_en[0]
         genPt=Events.gen_pt[0]
-        genEta=abs(Events.gen_eta[0])
-        genPhi=abs(Events.gen_phi[0])
+        genEta=Events.gen_eta[0]
+        genPhi=Events.gen_phi[0]
         #thicknessSF=getThicknessCorrectionForEta(genEta)
         #localOverburden=[x0*thicknessSF for x0 in baseOverburden]
         localOverburden=100*[1.0]
@@ -80,7 +80,7 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
         edeps_etaphi={}
         for idep in xrange(0,Events.nee):
             edep=Events.ee_edep[idep]*1e6/mipEn
-            if edep<1 : continue
+            #if edep<1 : continue
             layer=Events.ee_layer[idep]
             edeps[ layer-1 ] += edep
         
@@ -92,7 +92,8 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
             p4=TLorentzVector(gx,gy,gz,radius)
             phi=p4.Phi()
             eta=p4.Eta()
-            #print phi,ROOT.TMath.ATan2(gy,gx)
+            if idep==0 :
+                print phi,Events.ee_x[idep],Events.ee_y[idep],Events.ee_subsec[idep],gy,gx,ROOT.TMath.ATan2(gy,gx)
             etaPhiDisplay.Fill(eta,phi,edep)
 
             continue
