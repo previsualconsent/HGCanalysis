@@ -123,39 +123,46 @@ class ElectronCandidate:
         #save some plots
         c=ROOT.TCanvas("cetaphi","cetaphi",1000,1000);
         c.Divide(3,3)
-        sumEtaPhi=ROOT.TH2F('sumetaphi',';Pseudo-rapidity; #phi [rad]; Energy',50,-0.5,0.5,300,-1.5,1.5)
-        sumEtaPhi.GetXaxis().SetLabelSize(0.08);
-        sumEtaPhi.GetXaxis().SetTitleSize(0.08);
+        sumEtaPhi=ROOT.TH2F('sumetaphi',';#eta(rec)-#eta(gen); #phi(rec)-#phi(gen); Energy/MIP',25,-0.5,0.5,25,-1.0,1.0)
+        sumEtaPhi.GetXaxis().SetLabelSize(0.06);
+        sumEtaPhi.GetXaxis().SetTitleSize(0.07);
         sumEtaPhi.GetXaxis().SetTitleOffset(1.0);
         sumEtaPhi.GetXaxis().SetNdivisions(5);
-        sumEtaPhi.GetYaxis().SetLabelSize(0.08);
-        sumEtaPhi.GetYaxis().SetTitleSize(0.08);
+        sumEtaPhi.GetYaxis().SetLabelSize(0.06);
+        sumEtaPhi.GetYaxis().SetTitleSize(0.07);
         sumEtaPhi.GetYaxis().SetTitleOffset(1.2);
         sumEtaPhi.GetYaxis().SetNdivisions(5);
-        sumEtaPhi.GetZaxis().SetLabelSize(0.07);
-        sumEtaPhi.GetZaxis().SetTitleSize(0.08);
+        sumEtaPhi.GetZaxis().SetLabelSize(0.06);
+        sumEtaPhi.GetZaxis().SetTitleSize(0.07);
         sumEtaPhi.GetZaxis().SetTitleOffset(1.0);
         sumEtaPhi.GetZaxis().SetNdivisions(5);
         sumEtaPhi.GetZaxis().SetRangeUser(1e2,1e8);
-        sumEtaPhi_perLayer=[]
+        sumEtaPhi_perLayer={}
+        for layer in self.edeps_etaphi:
+            print layer,len(self.edeps_etaphi[layer])
+            sumEtaPhi_perLayer[layer]=sumEtaPhi.Clone('sumetaphi_'+str(layer))
+            sumEtaPhi_perLayer[layer].Reset('ICE')
+            for edep in self.edeps_etaphi[layer]:
+                sumEtaPhi_perLayer[layer].Fill(edep[0],edep[1],edep[2])
+            weight=1.0 #self.localOverburden[layer-1]/self.localOverburden[0]
+            sumEtaPhi.Add( sumEtaPhi_perLayer[ layer ], weight )
+
         layersToSample=[3,6,8,12,14,16,20,24]
         layersToSample3D=[8,14,20]
         ipad=0
-        for layer in self.edeps_etaphi:
+        sumEtaPhi_toDisplay={}
+        print len(sumEtaPhi_perLayer)
+        for layer in layersToSample:
+            sumEtaPhi_toDisplay[layer]=sumEtaPhi_perLayer[layer*3].Clone('sumetaphiint_%d'%layer)
+            sumEtaPhi_toDisplay[layer].Add(sumEtaPhi_perLayer[layer*3+1])
+            #sumEtaPhi_toDisplay[layer].Add(sumEtaPhi_perLayer[layer*3+2])
 
-            nhistos=len(sumEtaPhi_perLayer)
-            sumEtaPhi_perLayer.append(sumEtaPhi.Clone('sumetaphi_'+str(layer)))
-            sumEtaPhi_perLayer[nhistos].Reset('ICE')
-            for edep in self.edeps_etaphi[layer]:
-                print edep[0],edep[1],edep[2]
-                sumEtaPhi_perLayer[nhistos].Fill(edep[0],edep[1],edep[2])
-            weight=self.localOverburden[layer-1]/self.localOverburden[0]
-            sumEtaPhi.Add( sumEtaPhi_perLayer[ nhistos ], weight )
-
+        for layer in sumEtaPhi_toDisplay:
+            print layer
             if layer in layersToSample:
                 ipad=ipad+1
                 p=c.cd(ipad)
-                p.SetLogz();
+                #p.SetLogz();
                 p.SetBottomMargin(0.2);
                 p.SetRightMargin(0.05);
                 p.SetLeftMargin(0.2);
@@ -163,46 +170,47 @@ class ElectronCandidate:
                 if layer in layersToSample3D:
                     ROOT.gStyle.SetPalette(55);
                     #sumEtaPhi_perLayer[ nhistos ].Draw("surf2fb 0");
-                    sumEtaPhi_perLayer[ nhistos ].Draw("lego2fb 0");
-                    sumEtaPhi_perLayer[ nhistos ].GetZaxis().SetRangeUser(1,5e3);
+                    sumEtaPhi_toDisplay[ layer ].Draw("lego2fb 0");
+                    sumEtaPhi_toDisplay[ layer ].GetZaxis().SetRangeUser(1.0,5e3);
                     pt=MyPaveText('[Layer %d]'%layer,0.2,0.75,0.6,0.8)
                     pt.SetTextFont(42)
                     pt.SetTextAlign(12)
-                    pt.SetTextColor(16)
-                    pt.SetTextSize(0.09)
+                    #pt.SetTextColor(16)
+                    pt.SetTextSize(0.07)
                 else :
                     opt='col'
                     if ipad==1 : opt+='z'
-                    sumEtaPhi_perLayer[ nhistos ].Draw(opt)
-                    sumEtaPhi_perLayer[ nhistos ].GetZaxis().SetRangeUser(1,5e3);
+                    sumEtaPhi_toDisplay[ layer ].Draw(opt)
+                    sumEtaPhi_toDisplay[ layer ].GetZaxis().SetRangeUser(1.0,5e3);
                     pt=MyPaveText('[Layer %d]'%layer,0.2,0.25,0.6,0.3)
                     pt.SetTextFont(42)
                     pt.SetTextAlign(12)
-                    pt.SetTextColor(16)
-                    pt.SetTextSize(0.09)
+                    #pt.SetTextColor(16)
+                    pt.SetTextSize(0.07)
                 if ipad==1:
                     p.SetRightMargin(0.2);
-                    sumEtaPhi_perLayer[ nhistos ].GetZaxis().SetLabelSize(0.07);
-                    sumEtaPhi_perLayer[ nhistos ].GetZaxis().SetTitleSize(0.08);
-                    sumEtaPhi_perLayer[ nhistos ].GetZaxis().SetTitleOffset(0.9);
+                    sumEtaPhi_toDisplay[ layer ].GetZaxis().SetLabelSize(0.07);
+                    sumEtaPhi_toDisplay[ layer ].GetZaxis().SetTitleSize(0.08);
+                    sumEtaPhi_toDisplay[ layer ].GetZaxis().SetTitleOffset(0.9);
                 if ipad==1:
-                    MyPaveText('CMS simulation\\E^{gen}=%3.0f GeV\\ p_{T}^{gen}=%3.0f GeV, #eta^{gen}=%3.0f'
+                    pt=MyPaveText('CMS simulation\\E^{gen}=%3.0f GeV\\ p_{T}^{gen}=%3.0f GeV, #eta^{gen}=%3.0f'
                                %(self.gen_en,self.gen_pt,self.gen_eta),0.22,0.8)
-
+                    pt.SetTextSize(0.06)
+                    
         # show the sum in the last pad
         p=c.cd(9)
-        p.SetLogz();
+        #p.SetLogz();
         p.SetBottomMargin(0.2);
         p.SetRightMargin(0.05);
         p.SetLeftMargin(0.2);
         p.SetTopMargin(0.05);
         sumEtaPhi.Draw("lego2fb 0");
-        sumEtaPhi.GetZaxis().SetRangeUser(1,1e4)
-        pt=MyPaveText('[#Sigma w_{i} E_{i}]')
+        sumEtaPhi.GetZaxis().SetRangeUser(1,5e4)
+        pt=MyPaveText('[#Sigma E_{i}]',0.15,0.8)
         pt.SetTextFont(42)
         pt.SetTextAlign(12)
         pt.SetTextColor(16)
-        pt.SetTextSize(0.09)
+        pt.SetTextSize(0.08)
 
         c.Modified()
         c.Update()
@@ -210,5 +218,5 @@ class ElectronCandidate:
         raw_input()
         c.SaveAs(title+'.png')
         sumEtaPhi.Delete()
-        for h in sumEtaPhi_perLayer: h.Delete()
+        #for h in sumEtaPhi_perLayer: h.Delete()
                     

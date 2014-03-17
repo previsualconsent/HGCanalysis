@@ -53,7 +53,7 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
     Events=fin.Get(treeName)
     eeBottomHalfWidth = fin.Get('hgcSimHitsAnalyzer/eeBottomHalfWidth')
     #baseOverburden=1*[0.21]+10*[0.5]+10*[0.8]+10*[1.2]
-    for iev in xrange(0,Events.GetEntriesFast()) :
+    for iev in xrange(6,Events.GetEntriesFast()) :
 
         #some printout to know where we are
         if iev%100 == 0 :
@@ -96,27 +96,26 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
                 print phi,Events.ee_x[idep],Events.ee_y[idep],Events.ee_subsec[idep],gy,gx,ROOT.TMath.ATan2(gy,gx)
             etaPhiDisplay.Fill(eta,phi,edep)
 
-            continue
-
             #select around the electron a eta-phi square
-            #deta=eta-genEta
-            #dphi=TVector2.Phi_mpi_pi(phi-genPhi)
-            #print deta,dphi
-            #if TMath.Abs(deta)>0.5 or TMath.Abs(dphi)>1.5 : continue
-            #if not layer in edeps_etaphi:
-            #    edeps_etaphi[layer]=[]
-            #edeps_etaphi[layer].append([deta,dphi,edep])
+            deta=eta-genEta
+            dphi=TVector2.Phi_mpi_pi(phi-genPhi)
+            #if TMath.Abs(deta)>1.0 or TMath.Abs(dphi)>1.5 : continue
+            if not layer in edeps_etaphi: edeps_etaphi[layer]=[]
+            edeps_etaphi[layer].append([deta,dphi,edep])
 
 
         #overlay the pileup
         if nPU>0:
-            idxToOverlay=ROOT.gRandom.Uniform(0,len(mbEvRanges))
-            #print 'overlaying ',mbEvRanges[idxToOverlay][0],mbEvRanges[idxToOverlay][1]+1
+            idxToOverlay=0 #int(ROOT.gRandom.Uniform(0,len(mbEvRanges)))
+            
+            print 'overlaying ',mbEvRanges[idxToOverlay][0],mbEvRanges[idxToOverlay][1]+1
             for imbev in xrange(mbEvRanges[idxToOverlay][0],mbEvRanges[idxToOverlay][1]+1):
                 mbEvents.GetEntry(imbev)
                 for idep in xrange(0,mbEvents.nee):
                     edep=mbEvents.ee_edep[idep]*1e6/mipEn
-                    if edep<1 : continue
+                    layer=mbEvents.ee_layer[idep]
+                    edeps[ layer-1 ] += edep
+                    
                     gx=mbEvents.ee_gx[idep]
                     gy=mbEvents.ee_gy[idep]
                     gz=mbEvents.ee_gz[idep]
@@ -125,11 +124,11 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
                     phi=p4.Phi()
                     eta=p4.Eta()
                     etaPhiDisplay.Fill(eta,phi,edep) #*localOverburden[mbEvents.ee_layer[idep]-1]/localOverburden[0])
-
+                    
                     #select around the electron a eta-phi square
                     deta=eta-genEta
                     dphi=TVector2.Phi_mpi_pi(phi-genPhi)
-                    if TMath.Abs(deta)>0.5 or TMath.Abs(dphi)>1.5 : continue
+                    #if TMath.Abs(deta)>1.0 or TMath.Abs(dphi)>1.5 : continue
                     if not layer in edeps_etaphi:
                         edeps_etaphi[layer]=[]
                     edeps_etaphi[layer].append([deta,dphi,edep])
@@ -141,8 +140,8 @@ def runElectronAnalysis(url='particlegun.root',mbUrl='minbias.root',nPU=0,mipEn=
         ele.setGeneratorLevelInfo(genEn,genPt,genEta)
         ele.setLongitudinalProfile(edeps,localOverburden)
         ele.buildLongitudinalProfile(iev>10 and iev<20)
-        #ele.setTransverseProfile(edeps_etaphi)
-        #ele.buildTransverseProfile(iev<10)
+        ele.setTransverseProfile(edeps_etaphi)
+        ele.buildTransverseProfile(iev<10)
         
         if iev<10:
             c=ROOT.TCanvas('c','c',500,500)

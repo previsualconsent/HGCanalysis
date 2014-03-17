@@ -42,21 +42,23 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
 
   bool defineGeometry(edm::ESTransientHandle<DDCompactView> &ddViewH);
   
-  void analyzeEEHits(edm::Handle<edm::PCaloHitContainer> &caloHits, edm::Handle<edm::View<reco::Candidate> > &gen);
+  void analyzeHits(size_t isd, edm::Handle<edm::PCaloHitContainer> &caloHits, edm::Handle<edm::View<reco::Candidate> > &gen);
 
-  bool geometryDefined_;
   std::string ddViewName_;
-  std::string eeHits_, heHits_, genSource_;
+  bool        geometryDefined_;
+  std::vector<std::string> hitCollections_;
+  std::vector<int> cellSizePars_;
+  std::vector<std::string> sdTags_;
+  std::string genSource_;
 
-  HGCNumberingScheme *numberingScheme_;
+  std::vector<HGCNumberingScheme *> numberingSchemes_;
 
   TTree *t_;
   HGCSimEvent_t simEvt_;
-  TH1F *eeHeightH_,*eeBottomH_,*eeTopH_;
-  TH1F *eeTranslXH_, *eeTranslYH_, *eeTranslZH_, *eeBasePhiH_;
+  std::vector<TH1F *> sensNameH_, sensHeightH_,sensBottomH_,sensTopH_,sensTranslXH_,sensTranslYH_, sensTranslZH_, sensBasePhiH_;
 
   enum SVPars { HALF_H, HALF_B, HALF_T, TRANSL_X, TRANSL_Y, TRANSL_Z};
-  std::map<int, std::vector<double> >        eeSVpars_, eeSVphi_;
+  std::vector< std::map<int, std::vector<double> >  >       sensSVpars_, sensSVphi_;
 };
  
 
