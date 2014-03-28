@@ -13,6 +13,32 @@
 using namespace std;
 
 //
+std::pair<float,float> getLocalCoords(int cell, float cellSize, float h, float bl, float tl)
+{
+  //linear parameterization of the trapezoid
+  float a=2*h/(tl-bl);
+  float b=-h*(tl+bl)/(tl-bl);
+  
+  //find the y-row iteratively
+  int maxKy=floor(2*h/cellSize);
+  int ky(0),testCell(0);
+  for(int iky=0; iky<maxKy; iky++)
+    {
+      int deltay( floor( (iky*cellSize-h-b)/(a*cellSize) ) );
+      if(testCell+deltay > cell) break;
+      testCell+=deltay;
+      ky++;
+    }
+  
+  //find the x-column
+  int kx=cell-testCell;
+
+  //all done here (return centered at cell)
+  return std::pair<float,float>((kx+0.5)*cellSize,(ky+0.5)*cellSize-h);
+}
+
+
+//
 int assignCell(float x, float y, float cellSize, float h, float bl, float tl)
 {
   //linear parameterization of the trapezoid
@@ -48,8 +74,8 @@ void divideTrapezoid()
   //   float bl=59.5943 ; float tl=288.038 ; float h=647.784 ; float y=13.5927  ; float x=-584.223;
   float bl=57.556  ; float tl=281.626 ; float h=635.383 ;      float x=-30.902  ; float y=-561.339;
 
-  x=cellSize*(2+1./2);
-  y=-h+cellSize*(6+1./2);
+  x=cellSize*(0+1./2);
+  y=-h+cellSize*(0+1./2);
 
   //linear parameterization of the trapezoid
   float a=2*h/(tl-bl);
@@ -64,6 +90,10 @@ void divideTrapezoid()
   int icell=assignCell(x,y,cellSize,h,bl,tl);
 
   std::cout <<"(" << kx << "," << ky << ") -> " << icell << std::endl;
+
+  std::pair<float,float> localxy=getLocalCoords(icell,cellSize,h,bl,tl);
+  std::cout << localxy.first << "," << localxy.second << std::endl;
+  std::cout << x << "," << y << " <- orig" << std::endl;
 
   //show all of this
 

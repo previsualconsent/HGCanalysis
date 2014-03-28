@@ -79,7 +79,6 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
     }
 
   sensSVpars_.resize( hitCollections_.size() );
-  sensSVphi_.resize( hitCollections_.size() );
 }
 
 //
@@ -189,7 +188,6 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 	isd=i;
 	break;
       }
-    if(isd==2) { std::cout << name << std::endl; }
     if(isd==999999) continue; // a bit ugly ...
 
 
@@ -203,41 +201,53 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     //cf. http://root.cern.ch/root/html/src/ROOT__Math__Rotation3D.h.html#twSZND
     DDTranslation transl=eview.translation();
     DDRotationMatrix rot=eview.rotation();
-    DD3Vector xrot, yrot, zrot;
-    rot.GetComponents(xrot,yrot,zrot);
-    double basePhi=TMath::ATan2(-yrot.x(),xrot.x());
-    
+ 
     //set key to -1 if in negative z axis
     int layerKey(layer);
     if( transl.z()<0 ) layerKey *= -1;
+   
+//     DDExpandedNode parent = eview.geoHistory()[ eview.geoHistory().size()-2 ];
+//     DDTranslation parentTransl = parent.absTranslation();
+//     DDRotationMatrix parentRot = parent.absRotation();
+//     transl = parentRot.Inverse()*(transl - parentTransl );
+//     rot = parentRot.Inverse()*rot;
+//     rot = rot.Inverse(); 
+
+    DD3Vector xrot, yrot, zrot;
+    rot.GetComponents(xrot,yrot,zrot);
+    double basePhi=TMath::ATan2(-yrot.x(),xrot.x());
+ 
+    std::vector<double> solidPars=eview.logicalPart().solid().parameters();
+    
+    SectorGeometry_t isector;
+    isector.basePhi=basePhi;
+    isector.halfHeight=solidPars[3];
+    isector.halfBottom=solidPars[4];
+    isector.halfTop=solidPars[5];
+    isector.halfWidth=solidPars[0];
+    isector.globalX=transl.x();
+    isector.globalY=transl.y();
+    isector.globalZ=transl.z();
+    isector.xx=xrot.x(); isector.xy=yrot.x(); isector.xz=zrot.x();
+    isector.yx=xrot.y(); isector.yy=yrot.y(); isector.yz=zrot.y();
+    isector.zx=xrot.z(); isector.zy=yrot.z(); isector.zz=zrot.z();
 
     //save half height and widths for the trapezoid
     if(sensSVpars_[isd].find(layerKey)==sensSVpars_[isd].end()) 
       {
-	std::vector<double> solidPars=eview.logicalPart().solid().parameters();
-	std::vector<double> layerPars;
-	layerPars.push_back( solidPars[3] ); //height
-	layerPars.push_back( solidPars[4] ); //bottom
-	layerPars.push_back( solidPars[5] ); //top
-	layerPars.push_back( transl.x()*xrot.x()+transl.y()*xrot.y()+transl.z()*xrot.z() ); //X position before rotation
-	layerPars.push_back( transl.x()*yrot.x()+transl.y()*yrot.y()+transl.z()*yrot.z() ); //Y position before rotation
-	layerPars.push_back( transl.x()*zrot.x()+transl.y()*zrot.y()+transl.z()*zrot.z() ); //Z position before rotation
-	sensSVpars_[isd][ layerKey ] = layerPars;
-	std::vector<double> phiPars(1,basePhi);
-	sensSVphi_[isd][ layerKey ]=phiPars;
+	std::vector<SectorGeometry_t> sectorPars(1,isector);
+	sensSVpars_[isd][layerKey]=sectorPars;
 	sensNameH_[isd]      ->Fill(0);
- 	sensHeightH_[isd]    ->Fill(layerKey, solidPars[3] );
- 	sensBottomH_[isd]    ->Fill(layerKey, solidPars[4] );
- 	sensTopH_[isd]       ->Fill(layerKey, solidPars[5] );
- 	sensTranslXH_[isd]   ->Fill(layerKey, layerPars[TRANSL_X] );
- 	sensTranslYH_[isd]   ->Fill(layerKey, layerPars[TRANSL_Y] );
- 	sensTranslZH_[isd]   ->Fill(layerKey, layerPars[TRANSL_Z] );
- 	sensBasePhiH_[isd]   ->Fill(layerKey, basePhi);
+ 	sensHeightH_[isd]    ->Fill(layerKey, isector.halfHeight);
+ 	sensBottomH_[isd]    ->Fill(layerKey, isector.halfBottom );
+ 	sensTopH_[isd]       ->Fill(layerKey, isector.halfTop );
+ 	sensTranslXH_[isd]   ->Fill(layerKey, isector.globalX);
+ 	sensTranslYH_[isd]   ->Fill(layerKey, isector.globalY);
+ 	sensTranslZH_[isd]   ->Fill(layerKey, isector.globalZ);
+ 	sensBasePhiH_[isd]   ->Fill(layerKey, isector.basePhi);
       }
     else
-      {
-	sensSVphi_[isd][ layerKey ].push_back(basePhi);
-      }
+      sensSVpars_[isd][layerKey].push_back(isector);
     
   }while(eview.next() );
 
@@ -248,34 +258,51 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 //
 void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContainer> &caloHits, edm::Handle<edm::View<reco::Candidate> > &gen)
 {
+  //check inputs
   if(!caloHits.isValid()) return;
+  if(sensSVpars_.size()<=isd)
+    {
+      std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find SD parameters for iSD=" << isd << std::endl;
+      return;
+    }
+  
+  //analyze hits
   for(edm::PCaloHitContainer::const_iterator hit_it = caloHits->begin(); hit_it != caloHits->end(); ++hit_it) 
     {
       HGCEEDetId detId(hit_it->id());
-
+      
       int layer=detId.layer();
       int zpos=detId.zside();
 
+      //check layer
       int layerKey(layer);
       if(zpos<0) layerKey *= -1;
-
       if(sensSVpars_[isd].find(layerKey) == sensSVpars_[isd].end()){
-	std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << std::endl;
-	std::cout << detId << std::endl;
+	std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
 	continue;
       }
       
+      //check sector
+      int sector=detId.sector();
+      if(sensSVpars_[isd][layerKey].size()<size_t(sector))
+	{
+	  std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
+	  continue;
+	}
+      
+      //get the geometry info
+      SectorGeometry_t &isector=sensSVpars_[isd][layerKey][sector-1];
+
       int cell=detId.cell();
       std::pair<float,float> xy = numberingSchemes_[isd]->getLocalCoords(cell,
 									 numberingSchemes_[isd]->getCellSize(),
-									 sensSVpars_[isd][layerKey][HALF_H],
-									 sensSVpars_[isd][layerKey][HALF_B],
-									 sensSVpars_[isd][layerKey][HALF_T]);
+									 isector.halfHeight,
+									 isector.halfBottom,
+									 isector.halfTop);
+      float localX(xy.first), localY(xy.second);
       int subsector=detId.subsector();
-      if(subsector==0) xy.first *=-1;
+      localX *= subsector;
       
-      int sector=detId.sector();
-
       //hit type
       simEvt_.hit_type[simEvt_.nhits]     = isd;
 
@@ -293,20 +320,16 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
       simEvt_.hit_t[simEvt_.nhits]      = hit_it->time();
 
       //local coordinates (relative to the center of the sensitive detector)
-      simEvt_.hit_x[simEvt_.nhits]      = xy.first;
-      simEvt_.hit_y[simEvt_.nhits]      = xy.second;
+      simEvt_.hit_x[simEvt_.nhits]      = localX;
+      simEvt_.hit_y[simEvt_.nhits]      = localY;
 
-      //global coordinates (translate+rotate x and y)
-      float gx(sensSVpars_[isd][layerKey][TRANSL_X]+xy.first), gy(sensSVpars_[isd][layerKey][TRANSL_Y]+xy.second);
-      float phi(0);
-      if(sensSVphi_[isd][layerKey].size()<(size_t)sector)
-	std::cout << "[HGCSimHitsAnalyzer][analyzeHits] can't find base phi for sector #" << sector << " @ layer #" << layerKey << std::endl
-		  << "\t Expecting max. " << sensSVphi_[isd][layerKey].size() << " sub-sectors" << std::endl;
-      else
-	phi=sensSVphi_[isd][layerKey][sector];
-      simEvt_.hit_gx[simEvt_.nhits]     = TMath::Cos(phi)*gx-TMath::Sin(phi)*gy;
-      simEvt_.hit_gy[simEvt_.nhits]     = TMath::Sin(phi)*gx+TMath::Cos(phi)*gy;
-      simEvt_.hit_gz[simEvt_.nhits]     = sensSVpars_[isd][layerKey][TRANSL_Z];
+      //global coordinates 
+      float rho=sqrt(pow(isector.globalX,2)+pow(isector.globalY,2));
+      float rotLocalX=localX;
+      float rotLocalY=localY+rho;
+      simEvt_.hit_gx[simEvt_.nhits]     = rotLocalX*isector.xx+rotLocalY*isector.xy;
+      simEvt_.hit_gy[simEvt_.nhits]     = rotLocalX*isector.yx+rotLocalY*isector.yy;
+      simEvt_.hit_gz[simEvt_.nhits]     = isector.globalZ;
 
       //increment array
       simEvt_.nhits++;

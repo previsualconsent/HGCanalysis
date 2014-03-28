@@ -3,6 +3,14 @@
 
 #define MAXHITS 1000000
 
+typedef struct 
+{
+  double halfHeight, halfBottom, halfTop, halfWidth;
+  double globalX,globalY,globalZ, basePhi;
+  double xx,xy,xz,yx,yy,yz,zx,zy,zz;
+} SectorGeometry_t;
+
+
 typedef struct { 
   Int_t event, lumi, run;
   Int_t ngen, gen_id[MAXHITS];

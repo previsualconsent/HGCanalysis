@@ -13,18 +13,11 @@ process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 from UserCode.HGCanalysis.storeTools_cff import fillFromStore
 
 process.source = cms.Source("PoolSource",                            
-                            fileNames=cms.untracked.vstring('file:particlegun.root')
-                            #fileNames=cms.untracked.vstring('file:minbias.root')
+                            fileNames=cms.untracked.vstring('file:/tmp/Events_10.root')
+                            #fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MinBias_v4')
+                            #fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/SingleElectron_v4')
                             )
-#process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MinBias_v1')
-#process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/SingleMuon_v1')
-#process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/SingleElectron_v1')
-process.source.fileNames=cms.untracked.vstring('file:/afs/cern.ch/user/p/psilva/work/CMSSW_6_2_0_SLHC8/src/UserCode/HGCanalysis/Events_1.root',
-                                               'file:/afs/cern.ch/user/p/psilva/work/CMSSW_6_2_0_SLHC8/src/UserCode/HGCanalysis/Events_2.root',
-                                               'file:/afs/cern.ch/user/p/psilva/work/CMSSW_6_2_0_SLHC8/src/UserCode/HGCanalysis/Events_3.root',
-                                               'file:/afs/cern.ch/user/p/psilva/work/CMSSW_6_2_0_SLHC8/src/UserCode/HGCanalysis/Events_4.root',
-                                               'file:/afs/cern.ch/user/p/psilva/work/CMSSW_6_2_0_SLHC8/src/UserCode/HGCanalysis/Events_1847.root'
-                                               )
+
 process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
 print process.source.fileNames

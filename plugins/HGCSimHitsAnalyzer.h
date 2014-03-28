@@ -56,9 +56,7 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   TTree *t_;
   HGCSimEvent_t simEvt_;
   std::vector<TH1F *> sensNameH_, sensHeightH_,sensBottomH_,sensTopH_,sensTranslXH_,sensTranslYH_, sensTranslZH_, sensBasePhiH_;
-
-  enum SVPars { HALF_H, HALF_B, HALF_T, TRANSL_X, TRANSL_Y, TRANSL_Z};
-  std::vector< std::map<int, std::vector<double> >  >       sensSVpars_, sensSVphi_;
+  std::vector< std::map<int, std::vector<SectorGeometry_t> >  >       sensSVpars_;
 };
  
 
