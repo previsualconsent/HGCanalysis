@@ -68,7 +68,9 @@ def fillFromStore(dir,ffile=0,step=-1,generatePfn=True):
                 
                 sline=''
                 if(prefix=='eoscms') :
-                    if(generatePfn) : sline=commands.getstatusoutput('cmsPfn ' + line )[1]
+                    if(generatePfn) :
+                        sline='root://eoscms//eos/cms/'+line
+                        #sline=commands.getstatusoutput('cmsPfn ' + line )[1]
                     else            : sline=line
                 elif(prefix=='singlefile') :
                     sline='file://' + line

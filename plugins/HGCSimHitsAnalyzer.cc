@@ -76,6 +76,7 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
       sensTranslXH_.push_back( fs->make<TH1F>(prefix+"_TranslX",         ";Layer;Translation X [mm]",     400,-200.,200.) );
       sensTranslYH_.push_back( fs->make<TH1F>(prefix+"_TranslY",         ";Layer;Translation Y [mm]",     400,-200.,200.) );
       sensTranslZH_.push_back( fs->make<TH1F>(prefix+"_TranslZ",         ";Layer;Translation Z [mm]",     400,-200.,200.) );
+      sensNSectorsH_.push_back( fs->make<TH1F>(prefix+"_NSectors",       ";Layer;#Sectors",               400,-200.,200.) );
     }
 
   sensSVpars_.resize( hitCollections_.size() );
@@ -148,7 +149,7 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
   }
   
   const DDCompactView &cview=*ddViewH;
-
+  
   //get geometry parameters from DDD (cell size, layer limits, etc.)
   DDSpecificsFilter filter0;
   DDValue ddv0("Volume", "HGC", 0);
@@ -250,6 +251,16 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
       sensSVpars_[isd][layerKey].push_back(isector);
     
   }while(eview.next() );
+
+
+  //number of sectors per layer  
+  for(size_t isd=0; isd<sensSVpars_.size(); isd++)
+    for(int xbin=1; xbin<=sensNSectorsH_[isd]->GetXaxis()->GetNbins(); xbin++)
+      {
+	Int_t layerKey=sensNSectorsH_[isd]->GetXaxis()->GetBinCenter(xbin);
+	if(sensSVpars_[isd].find(layerKey)==sensSVpars_[isd].end()) continue;
+	sensNSectorsH_[isd]->Fill(layerKey,sensSVpars_[isd][layerKey].size());
+      }
 
   //all done here
   return true;
