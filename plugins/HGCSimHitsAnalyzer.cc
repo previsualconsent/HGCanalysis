@@ -202,7 +202,8 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     //cf. http://root.cern.ch/root/html/src/ROOT__Math__Rotation3D.h.html#twSZND
     DDTranslation transl=eview.translation();
     DDRotationMatrix rot=eview.rotation();
- 
+    double basePhi=TMath::ATan2(transl.y(),transl.x());
+
     //set key to -1 if in negative z axis
     int layerKey(layer);
     if( transl.z()<0 ) layerKey *= -1;
@@ -216,8 +217,17 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 
     DD3Vector xrot, yrot, zrot;
     rot.GetComponents(xrot,yrot,zrot);
-    double basePhi=TMath::ATan2(-yrot.x(),xrot.x());
- 
+
+//     if(isd>0 && layerKey==1 && sensSVpars_[isd].find(layerKey)==sensSVpars_[isd].end())
+//       {
+// 	std::cout << isd << std::endl
+// 		  << "Layer: " << layerKey << std::endl
+// 		  << basePhi << std::endl
+// 		  << "\t" << transl.x() << " " << transl.y() << std::endl
+// 		  << "\t" << xrot.x() << " " << xrot.y() << " " << std::endl
+// 		  << "\t" << yrot.x() << " " << yrot.y() << " " << std::endl;
+//       }
+
     std::vector<double> solidPars=eview.logicalPart().solid().parameters();
     
     SectorGeometry_t isector;
@@ -248,8 +258,10 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
  	sensBasePhiH_[isd]   ->Fill(layerKey, isector.basePhi);
       }
     else
-      sensSVpars_[isd][layerKey].push_back(isector);
-    
+      {
+	isector.basePhi = sensSVpars_[isd][layerKey][0].basePhi;
+	sensSVpars_[isd][layerKey].push_back(isector);
+      }
   }while(eview.next() );
 
 
@@ -338,8 +350,10 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
       float rho=sqrt(pow(isector.globalX,2)+pow(isector.globalY,2));
       float rotLocalX=localX;
       float rotLocalY=localY+rho;
-      simEvt_.hit_gx[simEvt_.nhits]     = rotLocalX*isector.xx+rotLocalY*isector.xy;
-      simEvt_.hit_gy[simEvt_.nhits]     = rotLocalX*isector.yx+rotLocalY*isector.yy;
+      simEvt_.hit_gx[simEvt_.nhits]     = rotLocalX*(TMath::Cos(isector.basePhi)*isector.xx-TMath::Sin(isector.basePhi)*isector.yx)
+	                                + rotLocalY*(TMath::Cos(isector.basePhi)*isector.xy-TMath::Sin(isector.basePhi)*isector.yy);
+      simEvt_.hit_gy[simEvt_.nhits]     = rotLocalX*(TMath::Sin(isector.basePhi)*isector.xx+TMath::Cos(isector.basePhi)*isector.yx)
+                                      	+ rotLocalY*(TMath::Sin(isector.basePhi)*isector.xy+TMath::Cos(isector.basePhi)*isector.yy);
       simEvt_.hit_gz[simEvt_.nhits]     = isector.globalZ;
 
       //increment array

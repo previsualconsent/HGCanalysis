@@ -15,10 +15,11 @@ from UserCode.HGCanalysis.storeTools_cff import fillFromStore
 process.source = cms.Source("PoolSource",                            
                             fileNames=cms.untracked.vstring()
                             )
-process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MinBias_v4')
-#process.source.fileNames=cms.untracked.vstring('file:Events_1.root','file:Events_2.root','file:Events_3.root','file:Events_4.root','file:Events_5.root')
+#process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/MinBias_v4')
+#process.source.fileNames=cms.untracked.vstring('file:Events_1.root')#,'file:Events_2.root','file:Events_3.root','file:Events_4.root','file:Events_5.root')
 #process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/SingleElectron_v5')
-                            
+process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/SingleMuon_v5')
+
 process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
 print process.source.fileNames
