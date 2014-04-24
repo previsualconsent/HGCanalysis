@@ -79,8 +79,11 @@ def testSimHitsPos(url):
         
       if i==0: MyPaveText('CMS simulation')
       MyPaveText('[hit_type=%d]'%i,0.8,0.95,0.9,0.99).SetTextFont(42)
-      
-  raw_input()
+
+    allCanvas[ic].Modified()
+    allCanvas[ic].Update()
+    allCanvas[ic].SaveAs(v+'.png')
+
 
 """
 checks the input arguments and steers the analysis

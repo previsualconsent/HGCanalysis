@@ -26,7 +26,7 @@ sdType=(0 1)
 for p in ${pileup[@]}; do
    for c in ${cell[@]}; do
 	for s in ${sdType[@]}; do
-	   python test/analysis/runOccupancyAnalysis.py -i HGCSimHitsAnalysis.root -c ${c} -p ${p} -s ${s} & 
+	   python test/analysis/runOccupancyAnalysis.py -i /data/psilva/MinBias_SimHits.root -c ${c} -p ${p} -s ${s} & 
 	done
    done
 done

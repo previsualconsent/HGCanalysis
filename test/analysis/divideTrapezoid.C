@@ -168,12 +168,14 @@ void divideTrapezoid()
     }
 
 
-  TPaveText *pt=new TPaveText(0.2,0.9,0.5,0.95,"brNDC");
+  TPaveText *pt=new TPaveText(0.12,0.9,0.5,0.95,"brNDC");
   pt->SetBorderSize(0);
   pt->SetFillStyle(0);
   pt->SetTextFont(42);
   char buf[200];
-  sprintf(buf,"# channels per sub-sector=%d",ncells);
+  sprintf(buf,"%d x %d mm^{2} cells",cellSize,cellSize);
+  pt->AddText(buf);
+  sprintf(buf,"# cells / 10 deg sub-sector = %d",ncells);
   pt->AddText(buf);
   pt->SetTextAlign(12);
   pt->Draw();

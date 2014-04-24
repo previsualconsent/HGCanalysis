@@ -21,6 +21,7 @@ def getSubsectorTemplateForLayer(layer,h,bl,tl,cell):
     name='layer%dcell%d'%(layer,cell)
     title='Layer %d Cell %dx%d mm^{2};x [mm];y [mm]'%(layer,cell,cell)
     h=TH2F(name,title,2*ndivx,-cell*ndivx,cell*ndivx,2*ndivy,-cell*ndivy,cell*ndivy)
+    h.Sumw2()
     h.SetDirectory(0)
     return h
 
@@ -86,27 +87,33 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
         subLayerToSample=[0,1]
     layerHistos=getLayerSubSectorHistos(fin,cellSize,sdType,sdCtrPeriod)
 
-    #create histograms for the analysis
+    #
+    # histograms for analysis
+    #
+    layerEnAverage={}
+    layerEnIsoAverage={}
     layerOccAverage={}
-    layerEnRanges={}
-    layerAvgEnRanges={}
     for l in layerHistos:
 
+        #energy distributions
+        ybins=layerHistos[l][0].GetYaxis().GetNbins()
+        ymin=layerHistos[l][0].GetYaxis().GetXmin()
+        ymax=layerHistos[l][0].GetYaxis().GetXmax()
+        layerEnAverage[l]=TH2F('avgen_layer%d'%(l),';<Energy / MIP>; y [mm]; Events',100,0.,5.,ybins,ymin,ymax)
+        layerEnAverage[l].SetDirectory(0)
+        layerEnAverage[l].Sumw2()
+        for ring in [1,2,3]:
+            if not ring in layerEnIsoAverage : layerEnIsoAverage[ring]={}
+            layerEnIsoAverage[ring][l]=TH2F('avgeniso%d_layer%d'%(ring,l),';< #Sigma_{R<%d} Iso Energy/ MIP >; y [mm]; Events'%ring,100,0.,8.,ybins,ymin,ymax)
+            layerEnIsoAverage[ring][l].Sumw2()
+            layerEnIsoAverage[ring][l].SetDirectory(0)
+            
+            
         #occupancy profiles
-        for thr in [1,5,10,25,50,100]:
+        for thr in [0.4,1,5,10,25,50]:
             if not thr in layerOccAverage : layerOccAverage[thr]={}
-            layerOccAverage[thr][l]=layerHistos[l][0].Clone('avgocc_%dmip_layer%d'%(thr,l))
+            layerOccAverage[thr][l]=layerHistos[l][0].Clone('avgocc_%dmip_layer%d'%(thr*10,l))
             layerOccAverage[thr][l].SetDirectory(0)
-
-        #energy ranges
-        for q in ['max','mean','std','q50','q90']:
-            if not q in layerEnRanges :
-                layerEnRanges[q]={}
-                layerAvgEnRanges[q]={}
-            layerEnRanges[q][l]=layerHistos[l][0].Clone('eranges_%s_layer%d'%(q,l))
-            layerEnRanges[q][l].SetDirectory(0)
-            layerAvgEnRanges[q][l]=layerHistos[l][0].Clone('avgeranges_%s_layer%d'%(q,l))
-            layerAvgEnRanges[q][l].SetDirectory(0)
 
     #dictionary to translate to pseudo-rapidity
     cellEtaMap={}
@@ -132,10 +139,9 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
     #iterate over events
     iSetCtr=0
     for iSet in evRanges:
-
-        #if iSetCtr>1: break
-
+        
         iSetCtr=iSetCtr+1
+        if iSetCtr>4: break
         sys.stdout.write( '\r Status [%d/%d]'%(iSetCtr,len(evRanges)) )
         sys.stdout.flush()
                 
@@ -143,6 +149,7 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
         for l in layerHistos:
             for h in layerHistos[l]:
                 h.Reset('ICE')
+                
         
         #sum up N events
         for iev in xrange(iSet[0],iSet[1]+1):
@@ -171,65 +178,78 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
                 layerHistos[ layer ][ sector ].Fill(x,y,edep)
 
                 
-        #now analyze
+        #average the histos over all the sectors
         for l in layerHistos:
-        
-            for xbin in xrange(1,layerHistos[l][0].GetXaxis().GetNbins()+1) :
-                for ybin in xrange(1,layerHistos[l][0].GetYaxis().GetNbins()+1) :
 
-                    #occupancy
-                    edeps=[]
-                    for secH in layerHistos[l]:
+            for secH in layerHistos[l]:
+                
+                centerXbin=secH.GetXaxis().FindBin(0)                
+                maxXbins=secH.GetXaxis().GetNbins()
+                maxYbins=secH.GetYaxis().GetNbins()
+            
+                for ybin in xrange(1,maxYbins+1) :
+                    
+                    yval=secH.GetYaxis().GetBinCenter(ybin)
+
+                    for xbin in xrange(1,maxXbins+1) :
+                        
+                        xval=secH.GetXaxis().GetBinCenter(xbin)
                         
                         enInCell=secH.GetBinContent(xbin,ybin)
-                        edeps.append(enInCell)
-                        
+
+                        #energy profile
+                        if xbin==centerXbin:
+                            fbin=layerEnAverage[l].GetXaxis().FindBin(enInCell)
+                            ffbin=layerEnAverage[l].GetYaxis().FindBin(yval)
+                            layerEnAverage[l].Fill(enInCell,yval)
+
+                            #ring profile with isolation veto
+                            if enInCell<1.0:
+                                for ring in layerEnIsoAverage:
+                                    sumInRing=0
+                                    nCellsInSum=0
+                                    for ix in xrange(xbin-ring,xbin+ring+1):
+                                        for iy in xrange(ybin-ring,ybin+ring+1):
+                                            if ix!=xbin and iy!=ybin :
+                                                if ix>0 and iy>1 and ix<=maxXbins and iy<=maxYbins : 
+                                                    sumInRing=sumInRing+secH.GetBinContent(ix,iy)
+                                                    nCellsInSum=nCellsInSum+1
+                                    #layerEnIsoAverage[ring][l].Fill(sumInRing/nCellsInSum,yval)
+                                    layerEnIsoAverage[ring][l].Fill(sumInRing,yval)
+
+                        #occupancy
                         for thr in layerOccAverage:
                             if enInCell<thr : continue
-                            curOcc=layerOccAverage[thr][l].GetBinContent(xbin,ybin)+1./len(layerHistos[l])
-                            layerOccAverage[thr][l].SetBinContent(xbin,ybin,curOcc)
-
-
-                    #quantiles for the energy deposition
-                    if max(edeps)==0 : continue
-                    
-                    for q in layerEnRanges:
-
-                        val=0
-                        if q=='max':  val=max(edeps)
-                        if q=='mean': val=np.mean(edeps)
-                        if q=='std':  val=np.std(edeps)
-                        if q=='q90':  val=np.percentile(edeps,90)
-                        if q=='q50':  val=np.percentile(edeps,50)
-                        
-                        maxVal=max(layerEnRanges[q][l].GetBinContent(xbin,ybin),val)
-                        avgVal=layerAvgEnRanges[q][l].GetBinContent(xbin,ybin)+val/len(edeps)
-                        
-                        layerAvgEnRanges[q][l].SetBinContent(xbin,ybin,avgVal)
-                        layerEnRanges[q][l].SetBinContent(xbin,ybin,maxVal)
-                    
-                    
-                    
+                            layerOccAverage[thr][l].Fill(xval,yval,1)
+                 
     #all done with the inputs
     fin.Close()
-
-                    
+    
     #save profiles obtained as function of y and y->eta map
     foutUrl='occprofiles_pu%d_sd%d_cell%d.root'%(avgPU,sdType,cellSize)
     fout=TFile.Open(foutUrl,'RECREATE')
     for l in layerHistos:
         cellEtaMap[l].SetDirectory(fout)
         cellEtaMap[l].Write()
+
+        avgWeight=1.0/iSetCtr
+        secWeight=1./len(layerHistos[l])
+        finalWeight=avgWeight*secWeight
+
+        layerEnAverage[l].Scale(finalWeight)
+        layerEnAverage[l].SetDirectory(fout)
+        layerEnAverage[l].Write()
+
+        for ring in layerEnIsoAverage:
+            
+            layerEnIsoAverage[ring][l].Scale(avgWeight)
+            layerEnIsoAverage[ring][l].SetDirectory(fout)
+            layerEnIsoAverage[ring][l].Write()
+
         for thr in layerOccAverage:
-            layerOccAverage[thr][l].Scale(1./iSetCtr)
+            layerOccAverage[thr][l].Scale(finalWeight)
             layerOccAverage[thr][l].SetDirectory(fout)
             layerOccAverage[thr][l].Write()
-        for q in layerEnRanges:
-            layerEnRanges[q][l].SetDirectory(fout)
-            layerEnRanges[q][l].Write()
-            layerAvgEnRanges[q][l].Scale(1./iSetCtr)
-            layerAvgEnRanges[q][l].SetDirectory(fout)
-            layerAvgEnRanges[q][l].Write()
                         
     fout.Close()
     print 'Results stored in %s'%foutUrl
@@ -256,6 +276,7 @@ def main():
     #plot formatting
     customROOTstyle()
     gROOT.SetBatch(True)
+    #gROOT.SetBatch(False)
     gStyle.SetPalette(55)
 
     print 'Overlaying %d average MinBias events'%opt.pu

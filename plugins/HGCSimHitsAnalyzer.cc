@@ -351,10 +351,14 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
       float rotLocalX=localX;
       float rotLocalY=localY+rho;
       simEvt_.hit_gx[simEvt_.nhits]     = rotLocalX*(TMath::Cos(isector.basePhi)*isector.xx-TMath::Sin(isector.basePhi)*isector.yx)
-	                                + rotLocalY*(TMath::Cos(isector.basePhi)*isector.xy-TMath::Sin(isector.basePhi)*isector.yy);
+	+ rotLocalY*(TMath::Cos(isector.basePhi)*isector.xy-TMath::Sin(isector.basePhi)*isector.yy);
       simEvt_.hit_gy[simEvt_.nhits]     = rotLocalX*(TMath::Sin(isector.basePhi)*isector.xx+TMath::Cos(isector.basePhi)*isector.yx)
-                                      	+ rotLocalY*(TMath::Sin(isector.basePhi)*isector.xy+TMath::Cos(isector.basePhi)*isector.yy);
+	+ rotLocalY*(TMath::Sin(isector.basePhi)*isector.xy+TMath::Cos(isector.basePhi)*isector.yy);
       simEvt_.hit_gz[simEvt_.nhits]     = isector.globalZ;
+
+      //simEvt_.hit_gx[simEvt_.nhits] = (1./rho)*(isector.globalX*localX-isector.globalY*localY-(rho-isector.halfHeight)*isector.globalX);
+      //simEvt_.hit_gy[simEvt_.nhits] = (1./rho)*(isector.globalY*localX+isector.globalX*localY-(rho-isector.halfHeight)*isector.globalY);
+      //simEvt_.hit_gz[simEvt_.nhits] = isector.globalZ; 
 
       //increment array
       simEvt_.nhits++;
