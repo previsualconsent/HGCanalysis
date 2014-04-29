@@ -52,7 +52,7 @@ def getLayerSubSectorHistos(fin,cell,sdType,sdCtrPeriod):
         #create new histogram only for the given sample period
         if sdCtrPeriod==1 or sdCtr%sdCtrPeriod==0 :
 
-            layer=layer/sdCtrPeriod+1
+            layer=(layer-1)/sdCtrPeriod+1
 
             templH=getSubsectorTemplateForLayer(layer,hl,bl,tl,cell)
             subsectorHistos[layer]=[]
@@ -73,12 +73,19 @@ def getLayerSubSectorHistos(fin,cell,sdType,sdCtrPeriod):
 """
 loops over the events and collects the electron energies
 """
-def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize=10,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
+def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize=10,iniSetCtr=0,finalSetCtr=-1,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
 
-    #analyze generated events
+    #analyze generated minimum bias events
     fin=TFile.Open(url)
     Events=fin.Get(treeName)
 
+    rangePostFix=''
+    if finalSetCtr>iniSetCtr : rangePostFix='_%dto%d'%(iniSetCtr,finalSetCtr)
+    foutUrl='occprofiles_pu%d_sd%d_cell%d%s.root'%(avgPU,sdType,cellSize,rangePostFix)
+
+    fout=TFile.Open(foutUrl,'RECREATE')
+    outTuple = ROOT.TNtuple("occ","occ","layer:eta:en:iso1:iso2:iso3")
+    
     #base templates in global coordinates and in local coordinates
     sdCtrPeriod=1
     subLayerToSample=[0]
@@ -91,7 +98,6 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
     # histograms for analysis
     #
     layerEnAverage={}
-    layerEnIsoAverage={}
     layerOccAverage={}
     for l in layerHistos:
 
@@ -102,12 +108,6 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
         layerEnAverage[l]=TH2F('avgen_layer%d'%(l),';<Energy / MIP>; y [mm]; Events',100,0.,5.,ybins,ymin,ymax)
         layerEnAverage[l].SetDirectory(0)
         layerEnAverage[l].Sumw2()
-        for ring in [1,2,3]:
-            if not ring in layerEnIsoAverage : layerEnIsoAverage[ring]={}
-            layerEnIsoAverage[ring][l]=TH2F('avgeniso%d_layer%d'%(ring,l),';< #Sigma_{R<%d} Iso Energy/ MIP >; y [mm]; Events'%ring,100,0.,8.,ybins,ymin,ymax)
-            layerEnIsoAverage[ring][l].Sumw2()
-            layerEnIsoAverage[ring][l].SetDirectory(0)
-            
             
         #occupancy profiles
         for thr in [0.4,1,5,10,25,50]:
@@ -125,7 +125,7 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
                            layerHistos[l][0].GetYaxis().GetXmin(),
                            layerHistos[l][0].GetYaxis().GetXmax())
         cellEtaMap[l].SetDirectory(0)
-        lbin=sdTranslX.GetXaxis().FindBin(l)
+        lbin=sdTranslX.GetXaxis().FindBin((l-1)*sdCtrPeriod+1)
         for xbin in xrange(1,layerHistos[l][0].GetYaxis().GetNbins()):
             gx=layerHistos[l][0].GetYaxis().GetBinCenter(xbin)+sdTranslX.GetBinContent(lbin)
             gz=sdTranslZ.GetBinContent(lbin)
@@ -138,19 +138,24 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
     
     #iterate over events
     iSetCtr=0
+    iGunCtr=0
     for iSet in evRanges:
         
         iSetCtr=iSetCtr+1
-        if iSetCtr>4: break
         sys.stdout.write( '\r Status [%d/%d]'%(iSetCtr,len(evRanges)) )
         sys.stdout.flush()
+
+        if iSetCtr<iniSetCtr: continue
+        if finalSetCtr>iniSetCtr :
+            if iSetCtr>finalSetCtr: continue
+
                 
         #reset entries in current histos
         for l in layerHistos:
             for h in layerHistos[l]:
                 h.Reset('ICE')
-                
-        
+
+
         #sum up N events
         for iev in xrange(iSet[0],iSet[1]+1):
 
@@ -170,19 +175,20 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
                 x=Events.hit_x[idep]
                 y=Events.hit_y[idep]
 
-                subLayer=layer%sdCtrPeriod+1
-                layer=layer/sdCtrPeriod
-                if not subLayer in subLayerToSample: continue
-                
-                #fill base histos
-                layerHistos[ layer ][ sector ].Fill(x,y,edep)
+                #print layer
+                subLayer=(layer-1)%sdCtrPeriod
+                layer=(layer-1)/sdCtrPeriod+1
 
+                #fill base histos                
+                if subLayer in subLayerToSample:
+                    layerHistos[ layer ][ sector ].Fill(x,y,edep)
                 
-        #average the histos over all the sectors
+        #sum the histos over all the sectors
         for l in layerHistos:
 
+            isec=0
             for secH in layerHistos[l]:
-                
+                isec=isec+1
                 centerXbin=secH.GetXaxis().FindBin(0)                
                 maxXbins=secH.GetXaxis().GetNbins()
                 maxYbins=secH.GetYaxis().GetNbins()
@@ -194,28 +200,32 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
                     for xbin in xrange(1,maxXbins+1) :
                         
                         xval=secH.GetXaxis().GetBinCenter(xbin)
-                        
                         enInCell=secH.GetBinContent(xbin,ybin)
+                        
+                        #energy spectrum in single cell
+                        if xbin == centerXbin:
 
-                        #energy profile
-                        if xbin==centerXbin:
-                            fbin=layerEnAverage[l].GetXaxis().FindBin(enInCell)
-                            ffbin=layerEnAverage[l].GetYaxis().FindBin(yval)
-                            layerEnAverage[l].Fill(enInCell,yval)
+                            #average energy, over sector
+                            layerEnAverage[l].Fill(yval,enInCell)
 
-                            #ring profile with isolation veto
-                            if enInCell<1.0:
-                                for ring in layerEnIsoAverage:
-                                    sumInRing=0
-                                    nCellsInSum=0
-                                    for ix in xrange(xbin-ring,xbin+ring+1):
-                                        for iy in xrange(ybin-ring,ybin+ring+1):
-                                            if ix!=xbin and iy!=ybin :
-                                                if ix>0 and iy>1 and ix<=maxXbins and iy<=maxYbins : 
-                                                    sumInRing=sumInRing+secH.GetBinContent(ix,iy)
-                                                    nCellsInSum=nCellsInSum+1
-                                    #layerEnIsoAverage[ring][l].Fill(sumInRing/nCellsInSum,yval)
-                                    layerEnIsoAverage[ring][l].Fill(sumInRing,yval)
+                            #isolation
+                            sumInRing={}
+                            nCellsInSum={}
+                            for ring in [1,2,3]:
+                                sumInRing[ring]=0
+                                nCellsInSum[ring]=0
+                                for ix in xrange(xbin-ring,xbin+ring+1):
+                                    for iy in xrange(ybin-ring,ybin+ring+1):
+                                        if not (ix==xbin and iy==ybin) :
+                                            if ix>0 and ix<=maxXbins and iy>0 and iy<=maxYbins : 
+                                                sumInRing[ring]=sumInRing[ring]+secH.GetBinContent(ix,iy)
+                                                nCellsInSum[ring]=nCellsInSum[ring]+1
+
+                            etaBin=cellEtaMap[l].FindBin(yval)
+                            eta=cellEtaMap[l].GetBinContent(etaBin)
+
+                            valsToStore=[l,eta,enInCell,sumInRing[1],sumInRing[2]-sumInRing[1],sumInRing[3]-sumInRing[2]]
+                            outTuple.Fill( array('f',valsToStore) )
 
                         #occupancy
                         for thr in layerOccAverage:
@@ -226,8 +236,6 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
     fin.Close()
     
     #save profiles obtained as function of y and y->eta map
-    foutUrl='occprofiles_pu%d_sd%d_cell%d.root'%(avgPU,sdType,cellSize)
-    fout=TFile.Open(foutUrl,'RECREATE')
     for l in layerHistos:
         cellEtaMap[l].SetDirectory(fout)
         cellEtaMap[l].Write()
@@ -240,17 +248,12 @@ def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize
         layerEnAverage[l].SetDirectory(fout)
         layerEnAverage[l].Write()
 
-        for ring in layerEnIsoAverage:
-            
-            layerEnIsoAverage[ring][l].Scale(avgWeight)
-            layerEnIsoAverage[ring][l].SetDirectory(fout)
-            layerEnIsoAverage[ring][l].Write()
-
         for thr in layerOccAverage:
             layerOccAverage[thr][l].Scale(finalWeight)
             layerOccAverage[thr][l].SetDirectory(fout)
             layerOccAverage[thr][l].Write()
-                        
+
+    outTuple.Write()
     fout.Close()
     print 'Results stored in %s'%foutUrl
 
@@ -262,10 +265,11 @@ def main():
 
     usage = 'usage: %prog [options]'
     parser = optparse.OptionParser(usage)
-    parser.add_option('-i', '--in'         ,    dest='input'              , help='Input file', default=None)
-    parser.add_option('-p', '--pu'         ,    dest='pu'                 , help='Average PU to overlay', default=0, type=int)
-    parser.add_option('-s', '--sd'         ,    dest='sd'                 , help='Sensitive detector to analyse', default=0, type=int)
-    parser.add_option('-c', '--cell'       ,    dest='cell'               , help='cell size [mm]', default=10, type=int)
+    parser.add_option('-i', '--in'         ,    dest='input'              , help='Input file',                          default=None           )
+    parser.add_option('-p', '--pu'         ,    dest='pu'                 , help='Average PU to overlay',               default=0,    type=int )
+    parser.add_option('-s', '--sd'         ,    dest='sd'                 , help='Sensitive detector to analyse',       default=0,    type=int )
+    parser.add_option('-c', '--cell'       ,    dest='cell'               , help='cell size [mm]',                      default=10,   type=int )
+    parser.add_option('-r', '--range'      ,    dest='range'              , help='first:last event to process',         default='0:-1')
     (opt, args) = parser.parse_args()
 
     if opt.input is None :
@@ -280,9 +284,12 @@ def main():
     gStyle.SetPalette(55)
 
     print 'Overlaying %d average MinBias events'%opt.pu
-
+    iniSetCtr=int(opt.range.split(':')[0])
+    finalSetCtr=int(opt.range.split(':')[1])
+    print 'Analysing %d to %d events'%(iniSetCtr,finalSetCtr)
+       
     #later can add other options
-    runOccupancyAnalysis(url=opt.input,avgPU=opt.pu,sdType=opt.sd,cellSize=opt.cell)
+    runOccupancyAnalysis(url=opt.input,avgPU=opt.pu,sdType=opt.sd,cellSize=opt.cell,iniSetCtr=iniSetCtr,finalSetCtr=finalSetCtr)
 
 if __name__ == "__main__":
     main()
