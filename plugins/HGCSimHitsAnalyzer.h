@@ -17,6 +17,7 @@
 
 #include "DataFormats/Candidate/interface/Candidate.h"
 
+#include "UserCode/HGCanalysis/interface/HGCSectorAccumulator.h"
 #include "UserCode/HGCanalysis/interface/HGCSimulationEvent.h"
 
 #include "TH1F.h"
@@ -45,7 +46,7 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   void analyzeHits(size_t isd, edm::Handle<edm::PCaloHitContainer> &caloHits, edm::Handle<edm::View<reco::Candidate> > &gen);
 
   std::string ddViewName_;
-  bool        geometryDefined_;
+  bool geometryDefined_;
   std::vector<std::string> hitCollections_;
   std::vector<int> cellSizePars_;
   std::vector<std::string> sdTags_;
@@ -55,8 +56,9 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
 
   TTree *t_;
   HGCSimEvent_t simEvt_;
-  std::vector<TH1F *> sensNameH_, sensHeightH_,sensBottomH_,sensTopH_,sensTranslXH_,sensTranslYH_, sensTranslZH_, sensBasePhiH_, sensNSectorsH_;
-  std::vector< std::map<int, std::vector<SectorGeometry_t> >  >       sensSVpars_;
+  std::map< std::pair<int,int>, std::vector<HGCSectorAccumulator> > allSectors_;
+
+  edm::Service<TFileService> *fs_;
 };
  
 

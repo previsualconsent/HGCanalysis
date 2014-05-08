@@ -17,7 +17,10 @@ python scripts/submitLocalHGCalProduction.py -q 1nd -n 500 -c test/runParticleGu
 python scripts/submitLocalHGCalProduction.py -q 1nd -n 100 -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleQuark_v1 -r XXX_PID_XXX:1
 python scripts/submitLocalHGCalProduction.py -q 1nd -n 100 -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleMuon_v1 -r XXX_PID_XXX:13
 
-
+Submit ntuples production
+for i in `seq 0 12 1500`; do
+	python scripts/submitLocalAnalysis_cfg.py -t MinBias_v4 -q 8nh -f ${i} -s 12;
+done
 
 #occupancy studies
 pileup=(100 140 200)

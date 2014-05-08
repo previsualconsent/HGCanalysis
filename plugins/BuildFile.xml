@@ -11,6 +11,7 @@
 <use name="DataFormats/Candidate"/>
 <use name="DataFormats/HepMCCandidate"/>
 <use name="CommonTools/UtilAlgos"/>
+<use name="UserCode/HGCanalysis"/>
 <use name="geant4core"/>
 <use name="root"/>
 <flags EDM_PLUGIN="1"/>
