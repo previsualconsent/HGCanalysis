@@ -35,7 +35,6 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   ddViewName_     = iConfig.getUntrackedParameter<std::string>("ddViewName", "");
   genSource_      = iConfig.getUntrackedParameter<std::string>("genSource",  "genParticles");
   hitCollections_ = iConfig.getUntrackedParameter< std::vector<std::string> >("hitCollections");
-  cellSizePars_   = iConfig.getUntrackedParameter< std::vector<int> >("cellSizePars");
   sdTags_         = iConfig.getUntrackedParameter< std::vector<std::string> >("sdTags");
 
   edm::Service<TFileService> fs;
@@ -156,7 +155,7 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
   
   const DDCompactView &cview=*ddViewH;
   
-  //get geometry parameters from DDD (cell size, layer limits, etc.)
+  //get geometry parameters from DDD
   DDSpecificsFilter filter0;
   DDValue ddv0("Volume", "HGC", 0);
   filter0.setCriteria(ddv0, DDSpecificsFilter::equals);
@@ -171,15 +170,11 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     std::cout << "[HGCSimHitsAnalyzer][defineGeometry] failed to retrieve geometry parameters from DDD" << std::endl;
     return false;
   }
-
-  //instantiate the numbering schemes
-  for(size_t i=0; i<cellSizePars_.size(); i++)
-    {
-      std::vector<double> igpar(1, gpar[ cellSizePars_[i] ] );
-      numberingSchemes_.push_back( new HGCNumberingScheme(igpar) );
-      std::cout << "[HGCSimHitsAnalyzer][defineGeometry] cell size for " << i << "-th hit collection is " << igpar[0] << std::endl;
-    }
   
+  //instantiate the numbering schemes
+  for(size_t i=0; i<sdTags_.size(); i++)
+    numberingSchemes_.push_back( new HGCNumberingScheme(cview,sdTags_[i]) );
+      
   //parse the DD for sensitive volumes
   DDExpandedView eview(cview);
   std::map<DDExpandedView::nav_type,int> idMap;
@@ -187,7 +182,7 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     const DDLogicalPart &logPart=eview.logicalPart();
     std::string name=logPart.name();
 
-    //only EE sensitive volumes for the moment
+    //check if name is required
     size_t isd(999999);
     for(size_t i=0; i<sdTags_.size(); i++)
       {
@@ -201,6 +196,15 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     //this is common
     size_t pos=name.find("Sensitive")+9;
     int layer=atoi(name.substr(pos,name.size()).c_str());
+
+    //get module geometry from numbering scheme
+    const std::vector<HGCalDDDConstants::hgtrap> &modGeom=numberingSchemes_[isd]->getDDDConstants()->getModules();
+    if(modGeom.size()<size_t(layer)) 
+      {
+	std::cout << "[HGCSimHitsAnalyzer] modGeom size is not enough to accomodate parsed layer #" << layer << std::endl;
+	continue;
+      }
+    double cellSize=modGeom[layer].cellSim;
 
     //translation and rotation for this part
     //note that the inverse rotation matrix elements are:
@@ -228,7 +232,7 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
       }
     int copyNb=allSectors_[sectorKey].size();
     allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,copyNb) );
-    allSectors_[sectorKey][copyNb].setGeometry(solidPars[3], solidPars[4], solidPars[5], gpar[ cellSizePars_[isd] ] );
+    allSectors_[sectorKey][copyNb].setGeometry(solidPars[3], solidPars[4], solidPars[5], cellSize );
     allSectors_[sectorKey][copyNb].setRotation(xrot,yrot,zrot);
     if(copyNb) basePhi=allSectors_[sectorKey][copyNb].getBasePhi();
     allSectors_[sectorKey][copyNb].setBasePhi(basePhi);
@@ -270,11 +274,8 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
 	}
       
       //get local coordinates
-      std::pair<float,float> xy = numberingSchemes_[isd]->getLocalCoords(detId.cell(),
-									 allSectors_[sectorKey][sector-1].getCellSize(),
-									 allSectors_[sectorKey][sector-1].getHalfHeight(),
-									 allSectors_[sectorKey][sector-1].getHalfBottom(),
-									 allSectors_[sectorKey][sector-1].getHalfTop());
+      std::pair<float,float> xy = numberingSchemes_[isd]->getLocalCoords(detId.cell(),detId.layer());
+
       float localX(xy.first), localY(xy.second);
       int subsector=detId.subsector();
       localX *= subsector;

@@ -1,4 +1,4 @@
-#include "UserCode/HGCAnalysis/interface/HuffmanAlgo.h"
+#include "UserCode/HGCanalysis/interface/HuffmanAlgo.h"
 
 #ifdef __CINT__
 

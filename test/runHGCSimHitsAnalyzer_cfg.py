@@ -38,8 +38,7 @@ print process.source.fileNames
 process.hgcSimHitsAnalyzer = cms.EDAnalyzer("HGCSimHitsAnalyzer",
                                             ddViewName     = cms.untracked.string(""),
                                             hitCollections = cms.untracked.vstring('HGCHitsEE',  'HGCHitsHEfront'),#      'HGCHitsHEback'           ),
-                                            sdTags         = cms.untracked.vstring('EESensitive','HESiliconSensitive'),#  'HEScintillatorSensitive'),
-                                            cellSizePars   = cms.untracked.vint32 ( 0,            1),#                   1                       ),
+                                            sdTags         = cms.untracked.vstring('HGCalEESensitive','HGCalHESiliconSensitive'),#  'HGCalHEScintillatorSensitive'),
                                             genSource      = cms.untracked.string("genParticles"),
                                             )
 

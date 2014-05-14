@@ -48,7 +48,6 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   std::string ddViewName_;
   bool geometryDefined_;
   std::vector<std::string> hitCollections_;
-  std::vector<int> cellSizePars_;
   std::vector<std::string> sdTags_;
   std::string genSource_;
 
