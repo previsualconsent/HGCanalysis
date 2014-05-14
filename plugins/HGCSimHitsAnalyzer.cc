@@ -96,7 +96,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
     {
       const reco::GenParticle & p = dynamic_cast<const reco::GenParticle &>( (*genParticles)[i] );
       if(p.status()!=1) continue;
-      if(abs(p.pdgId())!=11 && abs(p.pdgId())!=13) continue;
+      if(abs(p.pdgId())!=11 && abs(p.pdgId())!=13 && abs(p.pdgId())!=211) continue;
       simEvt_.gen_id[simEvt_.ngen]=p.pdgId();
       simEvt_.gen_pt[simEvt_.ngen]=p.pt();
       simEvt_.gen_eta[simEvt_.ngen]=p.eta();
