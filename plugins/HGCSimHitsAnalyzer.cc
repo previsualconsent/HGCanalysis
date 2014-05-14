@@ -198,13 +198,14 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     int layer=atoi(name.substr(pos,name.size()).c_str());
 
     //get module geometry from numbering scheme
-    const std::vector<HGCalDDDConstants::hgtrap> &modGeom=numberingSchemes_[isd]->getDDDConstants()->getModules();
+    std::vector<HGCalDDDConstants::hgtrap> modGeom=numberingSchemes_[isd]->getDDDConstants()->getModules();
     if(modGeom.size()<size_t(layer)) 
       {
 	std::cout << "[HGCSimHitsAnalyzer] modGeom size is not enough to accomodate parsed layer #" << layer << std::endl;
 	continue;
       }
-    double cellSize=modGeom[layer].cellSim;
+    double cellSize=modGeom[layer-1].cellSim;
+    int nSectors=numberingSchemes_[isd]->getDDDConstants()->sectors();
 
     //translation and rotation for this part
     //note that the inverse rotation matrix elements are:
@@ -229,16 +230,23 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
       {
 	std::vector<HGCSectorAccumulator> layerSectors;
 	allSectors_[sectorKey]=layerSectors;
+
+
+	//copy for nsectors
+	for(int isec=0; isec<nSectors; isec++)
+	  {
+	    allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,isec) );
+	    allSectors_[sectorKey][isec].setGeometry(solidPars[3], solidPars[4], solidPars[5], cellSize );
+	    allSectors_[sectorKey][isec].setRotation(xrot,yrot,zrot);
+	    if(isec) basePhi=allSectors_[sectorKey][isec].getBasePhi();
+	    allSectors_[sectorKey][isec].setBasePhi(basePhi);
+	    allSectors_[sectorKey][isec].setTranslation(transl);
+	    allSectors_[sectorKey][isec].configure(*fs_);    
+	  }
+	std::cout << nSectors << "sectors added for sd=" << sectorKey.first << " @ layer=" << sectorKey.second << " with cell size=" << cellSize << std::endl;
       }
-    int copyNb=allSectors_[sectorKey].size();
-    allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,copyNb) );
-    allSectors_[sectorKey][copyNb].setGeometry(solidPars[3], solidPars[4], solidPars[5], cellSize );
-    allSectors_[sectorKey][copyNb].setRotation(xrot,yrot,zrot);
-    if(copyNb) basePhi=allSectors_[sectorKey][copyNb].getBasePhi();
-    allSectors_[sectorKey][copyNb].setBasePhi(basePhi);
-    allSectors_[sectorKey][copyNb].setTranslation(transl);
-    allSectors_[sectorKey][copyNb].configure(*fs_);    
-    cout << "Sector #" << copyNb << " added for sd=" << sectorKey.first << " @ layer=" << sectorKey.second << endl;
+    else continue;
+
   }while(eview.next() );
 
   //all done here
@@ -265,6 +273,8 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
       int sector=detId.sector();
       if(allSectors_.find(sectorKey)==allSectors_.end()){
 	std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
+	
+
 	continue;
       }
       else if(allSectors_[sectorKey].size()<size_t(sector))

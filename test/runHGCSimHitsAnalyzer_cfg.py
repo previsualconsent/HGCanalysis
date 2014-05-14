@@ -8,7 +8,7 @@ process.load('Configuration.StandardSequences.MagneticField_38T_cff')
 
 ffile=0
 step=-1
-preFix='MinBias_v4'
+preFix='SingleMuon_v14'
 
 #configure from command line
 import sys
