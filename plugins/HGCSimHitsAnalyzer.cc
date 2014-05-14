@@ -192,10 +192,12 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     if(isd==999999) continue; // a bit ugly ...
 
 
-    //this is common
+    //this is common : convert already layer to RECO layer
     size_t pos=name.find("Sensitive")+9;
     int layer=atoi(name.substr(pos,name.size()).c_str());
-
+    layer=numberingSchemes_[isd]->getDDDConstants()->simToReco(1,layer,true).second;
+    if(layer<0) continue;
+    
     //get module geometry from numbering scheme
     std::vector<HGCalDDDConstants::hgtrap> modGeom=numberingSchemes_[isd]->getDDDConstants()->getModules();
     if(modGeom.size()<size_t(layer)) 
@@ -217,6 +219,7 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     //set key to -1 if in negative z axis
     int layerKey(layer);
     if( transl.z()<0 ) layerKey *= -1;
+
 
     DD3Vector xrot, yrot, zrot;
     rot.GetComponents(xrot,yrot,zrot);
@@ -263,8 +266,9 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
     {
       HGCalDetId detId(hit_it->id());
 
-      //check if det Id can be analyzed
+      //check if det Id can be analyzed (RECO layers are used)
       int layer=detId.layer();
+      layer=numberingSchemes_[isd]->getDDDConstants()->simToReco(1,layer,true).second;
       int zpos=detId.zside();
       int layerKey(layer);
       if(zpos<0) layerKey *= -1;

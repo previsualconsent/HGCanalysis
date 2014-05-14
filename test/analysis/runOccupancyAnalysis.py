@@ -75,9 +75,19 @@ loops over the events and collects the electron energies
 """
 def runOccupancyAnalysis(url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,cellSize=10,iniSetCtr=0,finalSetCtr=-1,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
 
+    #get templates 
+    
+
+
+
+
     #analyze generated minimum bias events
     fin=TFile.Open(url)
     Events=fin.Get(treeName)
+    
+
+
+    
 
     rangePostFix=''
     if finalSetCtr>iniSetCtr : rangePostFix='_%dto%d'%(iniSetCtr,finalSetCtr)
