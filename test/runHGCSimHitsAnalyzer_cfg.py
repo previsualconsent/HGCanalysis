@@ -8,7 +8,8 @@ process.load('Configuration.StandardSequences.MagneticField_38T_cff')
 
 ffile=0
 step=-1
-preFix='SingleMuon_v14'
+#preFix='SingleMuon_v14'
+preFix='SinglePion_v14'
 
 #configure from command line
 import sys
@@ -37,8 +38,8 @@ print process.source.fileNames
 
 process.hgcSimHitsAnalyzer = cms.EDAnalyzer("HGCSimHitsAnalyzer",
                                             ddViewName     = cms.untracked.string(""),
-                                            hitCollections = cms.untracked.vstring('HGCHitsEE',  'HGCHitsHEfront'),#      'HGCHitsHEback'           ),
-                                            sdTags         = cms.untracked.vstring('HGCalEESensitive','HGCalHESiliconSensitive'),#  'HGCalHEScintillatorSensitive'),
+                                            hitCollections = cms.untracked.vstring('HGCHitsEE',  'HGCHitsHEfront','HGCHitsHEback'           ),
+                                            sdTags         = cms.untracked.vstring('HGCalEESensitive','HGCalHESiliconSensitive',  'HGCalHEScintillatorSensitive'),
                                             genSource      = cms.untracked.string("genParticles"),
                                             )
 

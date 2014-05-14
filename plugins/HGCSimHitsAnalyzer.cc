@@ -20,8 +20,7 @@
 #include "FWCore/Utilities/interface/Exception.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
-#include "DataFormats/ForwardDetId/interface/HGCEEDetId.h"
-#include "DataFormats/ForwardDetId/interface/HGCHEDetId.h"
+#include "DataFormats/ForwardDetId/interface/HGCalDetId.h"
 
 #include "TVector2.h"
 
@@ -262,7 +261,7 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
   //analyze hits
   for(edm::PCaloHitContainer::const_iterator hit_it = caloHits->begin(); hit_it != caloHits->end(); ++hit_it) 
     {
-      HGCEEDetId detId(hit_it->id());
+      HGCalDetId detId(hit_it->id());
 
       //check if det Id can be analyzed
       int layer=detId.layer();
