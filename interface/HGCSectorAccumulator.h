@@ -23,7 +23,7 @@ class HGCSectorAccumulator
   
   HGCSectorAccumulator(int subDet,int layer, int copy);
   
-  inline void setGeometry(float h, float bl,float tl, float cell)    
+  inline void setGeometry(float h, float bl,float tl, float cell, float recoCell)    
     { 
       h_=h;  bl_=bl; tl_=tl; cell_=cell; 
     }
@@ -48,16 +48,24 @@ class HGCSectorAccumulator
 
   void configure(edm::Service<TFileService> &fs);
   int acquire(float edep, float t, float x, float y);         
+  int digitize(float adc, float x, float y);         
   void reset();
 
   TVector3 getGlobalPointAt(int bin);
   TVector2 getLocalPointAt(int bin);
   float getEnergyDepAt(int bin);
-  float getCellSize()   { return cell_; }
-  float getHalfHeight() { return h_;    }
-  float getHalfBottom() { return bl_;   }
-  float getHalfTop()    { return tl_;   }
-  TH2F *getAccumulator() { return edepH_; }
+  float getAverageTimeAt(int bin);
+  TVector3 getRecoGlobalPointAt(int bin);
+  TVector2 getRecoLocalPointAt(int bin);
+  float getADCsAt(int bin);
+  float getCellSize()     { return cell_;     }
+  float getRecoCellSize() { return recoCell_; }
+  float getHalfHeight()   { return h_;        }
+  float getHalfBottom()   { return bl_;       }
+  float getHalfTop()      { return tl_;       }
+  TH2F *getAccumulator()  { return edepH_;    }
+  TH2F *getTimer()        { return tH_;       }
+  TH2F *getDigis()        { return adcH_;     }
 
   void dumpGeometry()
   {
@@ -75,12 +83,12 @@ class HGCSectorAccumulator
  private:
 
   char id_[25], title_[50];
-  float h_, bl_, tl_, cell_;
+  float h_, bl_, tl_, cell_, recoCell_;
   float gx_, gy_, gz_, basePhi_;
   float xx_,xy_,xz_,yx_,yy_,yz_,zx_,zy_,zz_;
 
-  TH2F *gxH_,*gyH_,*gzH_,*edepH_;
-
+  TH2F *gxH_,    *gyH_,    *gzH_,    *edepH_, *tH_;
+  TH2F *gxRecoH_,*gyRecoH_,*gzRecoH_,*adcH_;
 };
 
 

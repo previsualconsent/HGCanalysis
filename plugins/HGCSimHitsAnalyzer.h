@@ -17,6 +17,9 @@
 
 #include "DataFormats/Candidate/interface/Candidate.h"
 
+#include "DataFormats/ForwardDetId/interface/HGCalDetId.h"
+#include "DataFormats/HGCDigi/interface/HGCDigiCollections.h"
+
 #include "UserCode/HGCanalysis/interface/HGCSectorAccumulator.h"
 #include "UserCode/HGCanalysis/interface/HGCSimulationEvent.h"
 
@@ -44,10 +47,13 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   bool defineGeometry(edm::ESTransientHandle<DDCompactView> &ddViewH);
   
   void analyzeHits(size_t isd, edm::Handle<edm::PCaloHitContainer> &caloHits, edm::Handle<edm::View<reco::Candidate> > &gen);
+  void analyzeHEDigis(size_t isd,edm::Handle<HGCHEDigiCollection> &heDigis);
+  void analyzeEEDigis(size_t isd,edm::Handle<HGCEEDigiCollection> &eeDigis);
+
 
   std::string ddViewName_;
   bool geometryDefined_;
-  std::vector<std::string> hitCollections_;
+  std::vector<std::string> hitCollections_, digiCollections_;
   std::vector<std::string> sdTags_;
   std::string genSource_;
 

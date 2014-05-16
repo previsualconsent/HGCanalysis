@@ -1,14 +1,21 @@
 #ifndef _hgcsimulationevent_h_
 #define _hgcsimulationevent_h_
 
-#define MAXHGCSIMHITS 1000000
+#define MAXHGCHITSPEREVENT 1000000
 
 typedef struct { 
   Int_t event, lumi, run;
-  Int_t ngen, gen_id[MAXHGCSIMHITS];
-  Float_t gen_pt[MAXHGCSIMHITS], gen_eta[MAXHGCSIMHITS], gen_phi[MAXHGCSIMHITS], gen_en[MAXHGCSIMHITS];
-  Int_t nhits, hit_type[MAXHGCSIMHITS], hit_layer[MAXHGCSIMHITS], hit_sec[MAXHGCSIMHITS], hit_bin[MAXHGCSIMHITS];
-  Float_t hit_edep[MAXHGCSIMHITS];
+  Int_t ngen, gen_id[MAXHGCHITSPEREVENT];
+  Float_t gen_pt[MAXHGCHITSPEREVENT], gen_eta[MAXHGCHITSPEREVENT], gen_phi[MAXHGCHITSPEREVENT], gen_en[MAXHGCHITSPEREVENT];
+
+  Int_t nhits;
+  Int_t hit_type[MAXHGCHITSPEREVENT], hit_layer[MAXHGCHITSPEREVENT], hit_sec[MAXHGCHITSPEREVENT], hit_bin[MAXHGCHITSPEREVENT];
+  Float_t hit_edep[MAXHGCHITSPEREVENT],hit_avgt[MAXHGCHITSPEREVENT];
+
+  Int_t ndigis;
+  Int_t digi_type[MAXHGCHITSPEREVENT], digi_layer[MAXHGCHITSPEREVENT], digi_sec[MAXHGCHITSPEREVENT], digi_bin[MAXHGCHITSPEREVENT];
+  Float_t digi_adc[MAXHGCHITSPEREVENT];
+
 } HGCSimEvent_t;
 
 
