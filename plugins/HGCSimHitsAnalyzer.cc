@@ -95,6 +95,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
   for(size_t i = 0; i < genParticles->size(); ++ i)
     {
       const reco::GenParticle & p = dynamic_cast<const reco::GenParticle &>( (*genParticles)[i] );
+      std::cout << p.status() << " " << p.pdgId() << " " << p.eta() << std::endl;  
       if(p.status()!=1) continue;
       if(abs(p.pdgId())!=11 && abs(p.pdgId())!=13 && abs(p.pdgId())!=211) continue;
       simEvt_.gen_id[simEvt_.ngen]=p.pdgId();
@@ -197,15 +198,17 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     int layer=atoi(name.substr(pos,name.size()).c_str());
     layer=numberingSchemes_[isd]->getDDDConstants()->simToReco(1,layer,true).second;
     if(layer<0) continue;
-    
-    //get module geometry from numbering scheme
-    std::vector<HGCalDDDConstants::hgtrap> modGeom=numberingSchemes_[isd]->getDDDConstants()->getModules();
-    if(modGeom.size()<size_t(layer)) 
+
+    std::vector<HGCalDDDConstants::hgtrap>::const_iterator firstMod=numberingSchemes_[isd]->getDDDConstants()->getFirstModule();
+    std::vector<HGCalDDDConstants::hgtrap>::const_iterator lastMod=numberingSchemes_[isd]->getDDDConstants()->getLastModule();
+    if(lastMod-firstMod<layer)
       {
-	std::cout << "[HGCSimHitsAnalyzer] modGeom size is not enough to accomodate parsed layer #" << layer << std::endl;
+	std::cout << "[HGCSimHitsAnalyzer] modGeom size " << lastMod-firstMod << " is not enough to accomodate parsed layer #" << layer << std::endl;
 	continue;
       }
-    double cellSize=modGeom[layer-1].cellSim;
+    std::vector<HGCalDDDConstants::hgtrap>::const_iterator modIt=firstMod;
+    for(int i=1;i<layer; i++) modIt++;
+    double cellSize=modIt->cellSim;
     int nSectors=numberingSchemes_[isd]->getDDDConstants()->sectors();
 
     //translation and rotation for this part
@@ -266,18 +269,15 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
     {
       HGCalDetId detId(hit_it->id());
 
-      //check if det Id can be analyzed (RECO layers are used)
       int layer=detId.layer();
-      layer=numberingSchemes_[isd]->getDDDConstants()->simToReco(1,layer,true).second;
       int zpos=detId.zside();
       int layerKey(layer);
       if(zpos<0) layerKey *= -1;
       std::pair<int,int> sectorKey(isd,layerKey);
       int sector=detId.sector();
+          
       if(allSectors_.find(sectorKey)==allSectors_.end()){
 	std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
-	
-
 	continue;
       }
       else if(allSectors_[sectorKey].size()<size_t(sector))

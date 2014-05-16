@@ -8,8 +8,8 @@ process.load('Configuration.StandardSequences.MagneticField_38T_cff')
 
 ffile=0
 step=-1
-#preFix='SingleMuon_v14'
-preFix='SinglePion_v14'
+preFix='SingleMuon_v14_fix'
+#preFix='SinglePion_v14'
 
 #configure from command line
 import sys
@@ -30,7 +30,7 @@ process.source = cms.Source("PoolSource",
                             fileNames=cms.untracked.vstring()
                             )
 process.source.fileNames=fillFromStore('/store/cmst3/group/hgcal/CMSSW/%s'%preFix,ffile,step)
-#process.source.fileNames=cms.untracked.vstring('file:///tmp/psilva/Events_485.root')
+#process.source.fileNames=cms.untracked.vstring('file:Events_1.root')
 
 process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
