@@ -138,8 +138,9 @@ for path in process.paths:
 	getattr(process,path)._seq = process.generator * getattr(process,path)._seq 
 
 # Automatic addition of the customisation function from SLHCUpgradeSimulations.Configuration.combinedCustoms
-from SLHCUpgradeSimulations.Configuration.combinedCustoms import cust_2023NoEE
+from SLHCUpgradeSimulations.Configuration.combinedCustoms import cust_2023HGCal
 
-#call to customisation function cust_2023NoEE imported from SLHCUpgradeSimulations.Configuration.combinedCustoms
-process = cust_2023NoEE(process)
+#call to customisation function cust_2023HGCal imported from SLHCUpgradeSimulations.Configuration.combinedCustoms
+process = cust_2023HGCal(process)
+
 

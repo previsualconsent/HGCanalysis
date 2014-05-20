@@ -250,10 +250,17 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 	std::cout << "[HGCSimHitsAnalyzer] modGeom size " << lastMod-firstMod << " is not enough to accomodate parsed layer #" << layer << std::endl;
 	continue;
       }
+
+    //simulated size
     std::vector<HGCalDDDConstants::hgtrap>::const_iterator modIt=firstMod;
     for(int i=1;i<layer; i++) modIt++;
-    double cellSize=modIt->cellSim;
-    double recoCellSize=modIt->cellRec;
+    double cellSize=modIt->cellSize;
+
+    //reco size
+    modIt=numberingSchemes_[isd]->getDDDConstants()->getFirstModule(true);
+    for(int i=1;i<layer; i++) modIt++;
+    double recoCellSize=modIt->cellSize;
+    
     int nSectors=numberingSchemes_[isd]->getDDDConstants()->sectors();
 
     //translation and rotation for this part
