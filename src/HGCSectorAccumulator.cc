@@ -50,9 +50,9 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
     }
 
   //init reco histos
-  ndivx=TMath::Floor(bl_/recoCell_);
-  ndivx=(ndivx+TMath::Floor((tl_-ndivx*recoCell_)/recoCell_));
-  ndivy=TMath::Floor(h_/recoCell_);
+  ndivx      = TMath::Floor(bl_/recoCell_);
+  ndivx      = (ndivx+TMath::Floor((tl_-ndivx*recoCell_)/recoCell_));
+  ndivy      = TMath::Floor(h_/recoCell_);
   adcH_      = fs->make<TH2F>(TString("ADC_") +id_,title_+TString(";x [mm];y [mm]"),  2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
   gxRecoH_   = fs->make<TH2F>(TString("recogx_")+id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
   gyRecoH_   = fs->make<TH2F>(TString("recogy_")+id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
@@ -82,6 +82,12 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
 int HGCSectorAccumulator::acquire(float edep, float t, float x, float y)
 {
   if(edepH_==0) return -1;
+  if(x>tl_ || x < -tl_ || y>h_ || y<-h_)
+    {
+      dumpGeometry();
+      std::cout << " Can't accumulate @ (" << x << " " << y << ")" <<  std::endl;
+      return 0;
+    }
   tH_->Fill(x,y,t*edep);
   return edepH_->Fill(x,y,edep);
 }

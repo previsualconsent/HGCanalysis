@@ -63,7 +63,7 @@ int assignCell(float x, float y, float cellSize, float h, float bl, float tl)
 
 void divideTrapezoid() 
 {
-  float cellSize(5);
+  float cellSize(9.5);
   //   float bl=58.3041 ; float tl=283.979 ; float h=639.934 ; float y=-18.1448 ; float x=-568.768;
   //   float bl=58.4537 ; float tl=284.45  ; float h=640.844 ; float y=-14.4645 ; float x=-570.561;
   //   float bl=58.6438 ; float tl=285.048 ; float h=642.001 ; float y=-9.78826 ; float x=-572.838;
@@ -72,10 +72,25 @@ void divideTrapezoid()
   //   float bl=59.2141 ; float tl=286.842 ; float h=645.47  ; float y=4.24031  ; float x=-579.669;
   //   float bl=59.4042 ; float tl=287.44  ; float h=646.627 ; float y=8.9165   ; float x=-581.946;
   //   float bl=59.5943 ; float tl=288.038 ; float h=647.784 ; float y=13.5927  ; float x=-584.223;
-  float bl=57.556  ; float tl=281.626 ; float h=635.383 ;      float x=-30.902  ; float y=-561.339;
+  //float bl=57.556  ; float tl=281.626 ; float h=635.383 ;      float x=-30.902  ; float y=-561.339;
+  //  float bl=56.2377; float tl=265.942 ; float h=594.645;      float x=-156.75; float y=513.767;
+  float bl=60.4919; float tl=285.782 ; float h=638.841;      float x=432.25; float y=606.631;
 
-  x=cellSize*(0+1./2);
-  y=-h+cellSize*(0+1./2);
+
+// Layer 26 Sector 2
+// h=638.841 b=60.4919 t=285.782 cell=9.5
+//   (x0,y0,z0)=(981.908,-2.15798e-12,3423.55)
+// rho=981.908phi=4.59163e-41
+//   |xx,xy,xz|=|1.22461e-161-6.12303e-16|
+//   |yx,yy,yz|=|-1-3.67382e-16-3.67382e-16|
+//   |zx,zy,zz|=|1.22461e-16-2.44921e-161|
+//  Can't accumulate @ (432.25 606.631)
+// 432.25,606.631,432.25,606.631
+// 2160
+  //23.75,572.409
+  
+  //x=cellSize*(0+1./2);
+  //  y=-h+cellSize*(0+1./2);
 
   //linear parameterization of the trapezoid
   float a=2*h/(tl-bl);
@@ -88,10 +103,10 @@ void divideTrapezoid()
   //find the cell sequentially in the trapezoid
   //notice the arithmetic sum can't be used as \sum floor(x) != floor( \sum x )
   int icell=assignCell(x,y,cellSize,h,bl,tl);
-
   std::cout <<"(" << kx << "," << ky << ") -> " << icell << std::endl;
-
-  std::pair<float,float> localxy=getLocalCoords(icell,cellSize,h,bl,tl);
+  
+  //  std::pair<float,float> localxy=getLocalCoords(icell,cellSize,h,bl,tl);
+  std::pair<float,float> localxy=getLocalCoords(2160,cellSize,h,bl,tl);
   std::cout << localxy.first << "," << localxy.second << std::endl;
   std::cout << x << "," << y << " <- orig" << std::endl;
 
@@ -173,7 +188,7 @@ void divideTrapezoid()
   pt->SetFillStyle(0);
   pt->SetTextFont(42);
   char buf[200];
-  sprintf(buf,"%d x %d mm^{2} cells",cellSize,cellSize);
+  sprintf(buf,"%3.1f x %3.1f mm^{2} cells",cellSize,cellSize);
   pt->AddText(buf);
   sprintf(buf,"# cells / 10 deg sub-sector = %d",ncells);
   pt->AddText(buf);

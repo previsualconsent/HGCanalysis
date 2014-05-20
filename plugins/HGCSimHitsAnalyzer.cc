@@ -327,6 +327,7 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
       if(zpos<0) layerKey *= -1;
       std::pair<int,int> sectorKey(isd,layerKey);
       int sector=detId.sector();
+      int subSector=detId.subsector();
           
       if(allSectors_.find(sectorKey)==allSectors_.end()){
 	std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
@@ -339,16 +340,21 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
 	}
       
       //get local coordinates
-      // std::pair<float,float> xy = numberingSchemes_[isd]->getLocalCoords(detId.cell(),detId.layer());
+      std::pair<float,float> oldxy = numberingSchemes_[isd]->getLocalCoords(detId.cell(),detId.layer());
       // float localX(xy.first), localY(xy.second);
       // int subsector=detId.subsector();
       // localX *= subsector;
 
-      std::pair<float,float> xy = numberingSchemes_[isd]->getDDDConstants()->locateCell(detId.cell(),detId.layer(),detId.subsector(),false);
-      float localX(xy.first), localY(xy.second);
+      std::pair<float,float> xy = numberingSchemes_[isd]->getDDDConstants()->locateCell(detId.cell(),detId.layer(),0,false);//detId.subsector(),false);
+      float localX(xy.first*subSector), localY(xy.second);
 
       //accumulate energy
-      allSectors_[sectorKey][sector-1].acquire(hit_it->energy(),hit_it->time(),localX,localY);
+      int fbin=allSectors_[sectorKey][sector-1].acquire(hit_it->energy(),hit_it->time(),localX,localY);
+      if(fbin==0)
+	{    
+	  std::cout << localX << "," << localY << "," << oldxy.first*detId.subsector() << "," << oldxy.second << std::endl;
+	  std::cout << detId.cell() << std::endl;
+	}
     }
 }
 
