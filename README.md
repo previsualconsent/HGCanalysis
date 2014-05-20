@@ -13,13 +13,15 @@ git push git@github.com:PFCal-dev/HGCanalysis
 
 Submit local production
 
-python scripts/submitLocalHGCalProduction.py -q 1nd -n 500 -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleElectron_v1 -r XXX_PID_XXX:11
-python scripts/submitLocalHGCalProduction.py -q 1nd -n 100 -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleQuark_v1 -r XXX_PID_XXX:1
-python scripts/submitLocalHGCalProduction.py -q 1nd -n 100 -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleMuon_v1 -r XXX_PID_XXX:13
+python scripts/submitLocalHGCalProduction.py -q 1nd -n 100  -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleMuon_v14     -r XXX_PID_XXX:13
+python scripts/submitLocalHGCalProduction.py -q 1nd -n 500  -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleElectron_v14 -r XXX_PID_XXX:11
+python scripts/submitLocalHGCalProduction.py -q 1nd -n 100  -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SinglePion_v14     -r XXX_PID_XXX:211
+python scripts/submitLocalHGCalProduction.py -q 1nd -n 100  -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleQuark_v14    -r XXX_PID_XXX:1
+python scripts/submitLocalHGCalProduction.py -q 1nd -n 2000 -c test/runMinBias_GEN_SIM_cfg.py     -o /store/cmst3/group/hgcal/CMSSW/MinBias_v14
 
 Submit ntuples production
-for i in `seq 0 12 1500`; do
-	python scripts/submitLocalAnalysis_cfg.py -t MinBias_v4 -q 8nh -f ${i} -s 12;
+for i in `seq 0 50 1950`; do
+	python scripts/submitLocalAnalysis_cfg.py -t MinBias_v14 -q 2nd -f ${i} -s 50;
 done
 
 #occupancy studies
