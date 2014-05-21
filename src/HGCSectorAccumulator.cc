@@ -1,5 +1,10 @@
 #include "UserCode/HGCanalysis/interface/HGCSectorAccumulator.h"
 
+#include "CLHEP/Geometry/Point3D.h"
+#include "CLHEP/Geometry/Plane3D.h"
+#include "CLHEP/Geometry/Vector3D.h"
+#include "CLHEP/Geometry/Transform3D.h"
+
 //
 HGCSectorAccumulator::HGCSectorAccumulator(int subDet,int layer, int copy) : gxH_(0), gyH_(0), gzH_(0), edepH_(0)
 {
@@ -17,9 +22,15 @@ HGCSectorAccumulator::~HGCSectorAccumulator()
 //
 void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
 {
+  //build the local -> global transformation
+  const CLHEP::HepRep3x3 rotation3x3 ( xx_, yx_, zx_, xy_, yy_, zy_, xz_, yz_, zz_ );
+  const CLHEP::HepRotation rotationMatrix( rotation3x3 );
+  const CLHEP::Hep3Vector translationVec( gx_, gy_, gz_);
+  const HepGeom::Transform3D local2globalTr(rotationMatrix,translationVec);
+  
   //cache global quantities
   float rho=sqrt(pow(gx_,2)+pow(gy_,2));
-  
+
   //init sim histos
   int ndivx=TMath::Floor(bl_/cell_);
   ndivx=(ndivx+TMath::Floor((tl_-ndivx*cell_)/cell_));
@@ -46,6 +57,12 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
 
 	  float gz = gz_;
 	  gzH_->SetBinContent(xbin,ybin,gz);
+
+	  const HepGeom::Point3D<float> lcoord(localX,localY,0);
+	  const HepGeom::Point3D<float> gcoord( local2globalTr*lcoord );
+
+	  std::cout << "Previous method (" <<  gx << "," << gy << "," << gz << std::endl
+		    << "New method      (" <<  gcoord.x() << "," << gcoord.y() << "," << gcoord.z() << std::endl << std::endl;  
 	}
     }
 
