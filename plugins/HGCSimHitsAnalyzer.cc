@@ -20,6 +20,10 @@
 #include "FWCore/Utilities/interface/Exception.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
+#include "CLHEP/Geometry/Point3D.h"
+#include "CLHEP/Geometry/Plane3D.h"
+#include "CLHEP/Geometry/Vector3D.h"
+
 #include "TVector2.h"
 
 #include <iostream>
@@ -123,7 +127,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
       edm::Handle<edm::PCaloHitContainer> caloHits;
       iEvent.getByLabel(edm::InputTag("g4SimHits",hitCollections_[i]),caloHits); 
       analyzeHits(i,caloHits,genParticles);
-      
+
       if(digiCollections_[i].find("HE") != std::string::npos)
 	{
 	  edm::Handle<HGCHEDigiCollection> heDigis;
@@ -137,7 +141,6 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 	  analyzeEEDigis(i,eeDigis);
 	}
     }
-  
 
   //dump accumulators to tree and reset
   for(std::map< std::pair<int,int>, std::vector<HGCSectorAccumulator> >::iterator it=allSectors_.begin(); it!=allSectors_.end(); it++)
@@ -145,6 +148,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
       for(size_t isec=0; isec<it->second.size(); isec++)
 	{
 	  TH2F *accH=(it->second)[isec].getAccumulator();
+	  if(accH==0) continue;
 	  TH2F *tH  =(it->second)[isec].getTimer();
 	  for(int xbin=1; xbin<=accH->GetXaxis()->GetNbins(); xbin++)
 	    {
@@ -165,6 +169,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 	  accH->Reset("ICE");
 	  tH->Reset("ICE");
 
+	  /*
 	  TH2F *adcH=(it->second)[isec].getDigis();
 	  for(int xbin=1; xbin<=adcH->GetXaxis()->GetNbins(); xbin++)
 	    {
@@ -182,6 +187,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 		}
 	    }  	    
 	  adcH->Reset("ICE");
+	  */
 	}
     }
  
@@ -196,116 +202,67 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
     std::cout << "[HGCSimHitsAnalyzer][defineGeometry] invalid DD handle" << std::endl;
     return false;
   }
-  
+
+  //instantiate the relevant numbering schemes  
   const DDCompactView &cview=*ddViewH;
-  
-  //get geometry parameters from DDD
-  DDSpecificsFilter filter0;
-  DDValue ddv0("Volume", "HGC", 0);
-  filter0.setCriteria(ddv0, DDSpecificsFilter::equals);
-  DDFilteredView fv0(cview);
-  fv0.addFilter(filter0);
-  fv0.firstChild();
-  DDsvalues_type sv0(fv0.mergedSpecifics());
-  std::vector<double> gpar;
-  DDValue ddv1("GeomParHGC");
-  if(DDfetch(&sv0,ddv1))  gpar = ddv1.doubles();
-  if(gpar.size()==0){
-    std::cout << "[HGCSimHitsAnalyzer][defineGeometry] failed to retrieve geometry parameters from DDD" << std::endl;
-    return false;
-  }
-  
-  //instantiate the numbering schemes
-  for(size_t i=0; i<sdTags_.size(); i++)
-    numberingSchemes_.push_back( new HGCNumberingScheme(cview,sdTags_[i]) );
-      
-  //parse the DD for sensitive volumes
-  DDExpandedView eview(cview);
-  std::map<DDExpandedView::nav_type,int> idMap;
-  do {
-    const DDLogicalPart &logPart=eview.logicalPart();
-    std::string name=logPart.name();
+  for(size_t isd=0; isd<sdTags_.size(); isd++)
+    {
+      numberingSchemes_.push_back( new HGCNumberingScheme(cview,sdTags_[isd]) );
 
-    //check if name is required
-    size_t isd(999999);
-    for(size_t i=0; i<sdTags_.size(); i++)
-      {
-	if(name.find(sdTags_[i])==std::string::npos) continue;
-	isd=i;
-	break;
-      }
-    if(isd==999999) continue; // a bit ugly ...
+      //instantiate energy accumulators for the different layers  
+      for(std::vector<HGCalDDDConstants::hgtrform>::const_iterator trformIt=numberingSchemes_[isd]->getDDDConstants()->getFirstTrForm(); 
+	  trformIt!=numberingSchemes_[isd]->getDDDConstants()->getLastTrForm(); 
+	  trformIt++) 
+	{
+	  int layerKey(trformIt->lay);
+	  std::vector<HGCalDDDConstants::hgtrap>::const_iterator modIt    = numberingSchemes_[isd]->getDDDConstants()->getFirstModule();
+	  std::vector<HGCalDDDConstants::hgtrap>::const_iterator recModIt = numberingSchemes_[isd]->getDDDConstants()->getFirstModule(true);
+	  for(int ilayer=1; ilayer<abs(layerKey); ilayer++) { modIt++; recModIt++; }
+	  if(layerKey!=modIt->lay || layerKey!=recModIt->lay)
+	    {
+	      std::cout << "Inconsistency found in layer " << layerKey << " between transformation struct and geometry struct for isd= " << isd << endl;
+	      continue;
+	    }
 
+	  //assign -1 if on the negative z
+	  layerKey *= trformIt->zp;
 
-    //this is common : convert already layer to RECO layer
-    size_t pos=name.find("Sensitive")+9;
-    int layer=atoi(name.substr(pos,name.size()).c_str());
-    layer=numberingSchemes_[isd]->getDDDConstants()->simToReco(1,layer,true).second;
-    if(layer<0) continue;
+	  //initiate new layer if needed
+	  std::pair<int,int> sectorKey(isd,layerKey);
+	  if(allSectors_.find(sectorKey)==allSectors_.end())
+	    {
+	      std::vector<HGCSectorAccumulator> layerSectors;
+	      allSectors_[sectorKey]=layerSectors;
+	    }
 
-    std::vector<HGCalDDDConstants::hgtrap>::const_iterator firstMod=numberingSchemes_[isd]->getDDDConstants()->getFirstModule();
-    std::vector<HGCalDDDConstants::hgtrap>::const_iterator lastMod=numberingSchemes_[isd]->getDDDConstants()->getLastModule();
-    if(lastMod-firstMod<layer)
-      {
-	std::cout << "[HGCSimHitsAnalyzer] modGeom size " << lastMod-firstMod << " is not enough to accomodate parsed layer #" << layer << std::endl;
-	continue;
-      }
+	  //initiate up to a new sector if needed
+	  int sector=trformIt->sec;
+	  if((int)allSectors_[sectorKey].size()<sector)
+	    {
+	      for(int isec=0; isec<sector; isec++)
+		allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,isec) );
+	    }
 
-    //simulated size
-    std::vector<HGCalDDDConstants::hgtrap>::const_iterator modIt=firstMod;
-    for(int i=1;i<layer; i++) modIt++;
-    double cellSize=modIt->cellSize;
-
-    //reco size
-    modIt=numberingSchemes_[isd]->getDDDConstants()->getFirstModule(true);
-    for(int i=1;i<layer; i++) modIt++;
-    double recoCellSize=modIt->cellSize;
+	  //configure this specific sector
+	  int isec=sector-1;
+	  double simCellSize(modIt->cellSize);         //Geant4 is in mm 
+	  double recoCellSize(recModIt->cellSize*10); //it comes in cm (CMS default)
+	  allSectors_[sectorKey][isec].setGeometry(modIt->h, modIt->bl, modIt->tl, simCellSize,recoCellSize);
+	  const HepGeom::Transform3D local2globalTr( trformIt->hr, trformIt->h3v );
+	  allSectors_[sectorKey][isec].setLocal2GlobalTransformation(local2globalTr);
+	  allSectors_[sectorKey][isec].configure(*fs_);    
+	}
     
-    int nSectors=numberingSchemes_[isd]->getDDDConstants()->sectors();
-
-    //translation and rotation for this part
-    //note that the inverse rotation matrix elements are:
-    //[xrot^T yrot^T zrot^T]
-    //cf. http://root.cern.ch/root/html/src/ROOT__Math__Rotation3D.h.html#twSZND
-    DDTranslation transl=eview.translation();
-    DDRotationMatrix rot=eview.rotation();
-    double basePhi=TMath::ATan2(transl.y(),transl.x());
-
-    //set key to -1 if in negative z axis
-    int layerKey(layer);
-    if( transl.z()<0 ) layerKey *= -1;
-
-
-    DD3Vector xrot, yrot, zrot;
-    rot.GetComponents(xrot,yrot,zrot);
-
-    std::vector<double> solidPars=eview.logicalPart().solid().parameters();
-
-    //initiate a new sector template
-    std::pair<int,int> sectorKey(isd,layerKey);
-    if(allSectors_.find(sectorKey)==allSectors_.end())
-      {
-	std::vector<HGCSectorAccumulator> layerSectors;
-	allSectors_[sectorKey]=layerSectors;
-
-
-	//copy for nsectors
-	for(int isec=0; isec<nSectors; isec++)
-	  {
-	    allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,isec) );
-	    allSectors_[sectorKey][isec].setGeometry(solidPars[3], solidPars[4], solidPars[5], cellSize, recoCellSize );
-	    allSectors_[sectorKey][isec].setRotation(xrot,yrot,zrot);
-	    if(isec) basePhi=allSectors_[sectorKey][isec].getBasePhi();
-	    allSectors_[sectorKey][isec].setBasePhi(basePhi);
-	    allSectors_[sectorKey][isec].setTranslation(transl);
-	    allSectors_[sectorKey][isec].configure(*fs_);    
-	  }
-	std::cout << nSectors << "sectors added for sd=" << sectorKey.first << " @ layer=" << sectorKey.second << " with cell size=" << cellSize << " and reco cell size= " << recoCellSize <<std::endl;
-      }
-    else continue;
-
-  }while(eview.next() );
-
+      for(std::map< std::pair<int,int>, std::vector<HGCSectorAccumulator> >::iterator it = allSectors_.begin();
+	  it!=allSectors_.end();
+	  it++)
+	{
+	  std::cout << it->second.size() << "sectors added for sd=" << it->first.first << " @ layer=" << it->first.second << std::endl;
+	  // " with sim cell size=" << simCellSize << " and reco cell size= " << recoCellSize <<std::endl;
+	}
+    }
+    
+  
   //all done here
   return true;
 }
@@ -338,20 +295,14 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
 	  std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
 	  continue;
 	}
-      
-      //get local coordinates
-      std::pair<float,float> oldxy = numberingSchemes_[isd]->getLocalCoords(detId.cell(),detId.layer());
 
+      //get local coordinates
       std::pair<float,float> xy = numberingSchemes_[isd]->getDDDConstants()->locateCell(detId.cell(),detId.layer(),detId.subsector(),false);
       float localX(xy.first), localY(xy.second);
 
       //accumulate energy
-      int fbin=allSectors_[sectorKey][sector-1].acquire(hit_it->energy(),hit_it->time(),localX,localY);
-      if(fbin==0)
-	{    
-	  std::cout << "New: " << localX << "," << localY << " Old:" << oldxy.first << "," << oldxy.second << std::endl;
-	  std::cout << detId.cell() << std::endl;
-	}
+      //      int fbin=
+      allSectors_[sectorKey][sector-1].acquire(hit_it->energy(),hit_it->time(),localX,localY);
     }
 }
 

@@ -4,8 +4,8 @@
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
-#include "DetectorDescription/Base/interface/DDTranslation.h"
-#include "DetectorDescription/Base/interface/DDRotationMatrix.h"
+
+#include "CLHEP/Geometry/Transform3D.h"
 
 #include "TMath.h"
 #include "TString.h"
@@ -28,23 +28,11 @@ class HGCSectorAccumulator
       h_=h;  bl_=bl; tl_=tl; cell_=cell; 
     }
   
-  inline void setRotation(DD3Vector &xrot,DD3Vector &yrot,DD3Vector &zrot) 
+  inline void setLocal2GlobalTransformation( const HepGeom::Transform3D &local2globalTr )
     {
-      xx_=xrot.x(); xy_=yrot.x(); xz_=zrot.x();
-      yx_=xrot.y(); yy_=yrot.y(); yz_=zrot.y();
-      zx_=xrot.z(); zy_=yrot.z(); zz_=zrot.z();
+      local2globalTr_=local2globalTr;
+      global2localTr_=local2globalTr.inverse();
     }
-  
-  inline void setTranslation(DDTranslation &transl)
-    {
-      gx_=transl.x(); gy_=transl.y(); gz_=transl.z();
-    }
-
-  inline void setBasePhi(float basePhi)
-    {
-      basePhi_=basePhi;
-    }
-  inline float getBasePhi() { return basePhi_; }
 
   void configure(edm::Service<TFileService> &fs);
   int acquire(float edep, float t, float x, float y);         
@@ -70,12 +58,12 @@ class HGCSectorAccumulator
   void dumpGeometry()
   {
     std::cout << title_ << std::endl
-	      << "h=" << h_ << " b=" << bl_ << " t=" << tl_ << " cell=" << cell_ << std::endl
-	      << "(x0,y0,z0)=(" << gx_ << "," << gy_ << "," << gz_ << ")" << std::endl
-	      << "rho=" << sqrt(gx_*gx_+gy_*gy_) << "phi=" << basePhi_ << std::endl
-	      << "|xx,xy,xz|=|" << xx_ << "\t" << xy_ << "\t" << xz_ << "|" << std::endl
-	      << "|yx,yy,yz|=|" << yx_ << "\t" << yy_ << "\t" << yz_ << "|" << std::endl
-	      << "|zx,zy,zz|=|" << zx_ << "\t" << zy_ << "\t" << zz_ << "|" << std::endl;
+	      << "h=" << h_ << " b=" << bl_ << " t=" << tl_ << " cell=" << cell_ << std::endl;
+      //	      << "(x0,y0,z0)=(" << gx_ << "," << gy_ << "," << gz_ << ")" << std::endl
+      //      << "rho=" << sqrt(gx_*gx_+gy_*gy_) << "phi=" << basePhi_ << std::endl
+      //	      << "|xx,xy,xz|=|" << xx_ << "\t" << xy_ << "\t" << xz_ << "|" << std::endl
+      //	      << "|yx,yy,yz|=|" << yx_ << "\t" << yy_ << "\t" << yz_ << "|" << std::endl
+      //	      << "|zx,zy,zz|=|" << zx_ << "\t" << zy_ << "\t" << zz_ << "|" << std::endl;
   }
 
   ~HGCSectorAccumulator();
@@ -84,8 +72,8 @@ class HGCSectorAccumulator
 
   char id_[25], title_[50];
   float h_, bl_, tl_, cell_, recoCell_;
-  float gx_, gy_, gz_, basePhi_;
-  float xx_,xy_,xz_,yx_,yy_,yz_,zx_,zy_,zz_;
+
+  HepGeom::Transform3D local2globalTr_,global2localTr_;
 
   TH2F *gxH_,    *gyH_,    *gzH_,    *edepH_, *tH_;
   TH2F *gxRecoH_,*gyRecoH_,*gzRecoH_,*adcH_;

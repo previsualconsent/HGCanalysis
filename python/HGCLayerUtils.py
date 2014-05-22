@@ -19,9 +19,12 @@ class LayerAccumulator:
                         
         #create the eta map
         newName=self.accumulator[0].GetName()
-        newName=newName.replace('E_','eta_')
-        self.etaMap=self.accumulator[0].Clone(newName)
+        self.rhoMap=self.accumulator[0].Clone(newName.replace('E_','rho_'))
+        self.rhoMap.SetDirectory(0)
+        self.etaMap=self.accumulator[0].Clone(newName.replace('E_','eta_'))
         self.etaMap.SetDirectory(0)
+        self.phiMap=self.accumulator[0].Clone(newName.replace('E_','phi_'))
+        self.phiMap.SetDirectory(0)
 
     def defineCoordinates(self, gxH, gyH, gzH):
         
@@ -32,10 +35,18 @@ class LayerAccumulator:
                 y=gyH.GetBinContent(xbin,ybin)
                 z=gzH.GetBinContent(xbin,ybin)
                 rho=TMath.Sqrt(x*x+y*y+z*z)
-                if rho>0 and rho>z:
-                    eta=0.5*TMath.Log( (rho+z)/(rho-z) )
-                    self.etaMap.SetBinContent(xbin,ybin,eta)
-
+                phi=TMath.ATan2(y,x)
+                eta=0
+                if rho>z: eta=0.5*TMath.Log( (rho+z)/(rho-z) )
+                self.rhoMap.SetBinContent(xbin,ybin,rho)
+                self.etaMap.SetBinContent(xbin,ybin,eta)
+                self.phiMap.SetBinContent(xbin,ybin,phi)
+                
+    def getGlobalCoordinates(self,sector,ibin):
+        xbin,ybin,zbin = ROOT.Long(), ROOT.Long(), ROOT.Long()
+        self.rhoMap.GetBinXYZ(ibin,xbin,ybin,zbin)
+        return self.rhoMap.GetBinContent(xbin,ybin),self.etaMap.GetBinContent(xbin,ybin),self.phiMap.GetBinContent(xbin,ybin)
+                    
     def addSector(self, sector):
         if sector==0: return
         self.accumulator[sector]=self.accumulator[0].Clone('E_accumulator_%d_%d'%(self.layer,sector)) 
@@ -47,6 +58,7 @@ class LayerAccumulator:
 
     def fill(self,edep,ibin,sector):
         self.accumulator[sector].SetBinContent(ibin,edep+self.accumulator[sector].GetBinContent(ibin))
+
                             
 """
 get all sector histograms into memory
