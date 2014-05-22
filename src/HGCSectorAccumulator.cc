@@ -70,8 +70,6 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
 	  gxRecoH_->SetBinContent(xbin,ybin,gcoord.x());
 	  gyRecoH_->SetBinContent(xbin,ybin,gcoord.y());
 	  gzRecoH_->SetBinContent(xbin,ybin,gcoord.z());
-
-
 	}
     }
 }

@@ -239,7 +239,7 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 	  int sector=trformIt->sec;
 	  if((int)allSectors_[sectorKey].size()<sector)
 	    {
-	      for(int isec=0; isec<sector; isec++)
+	      for(int isec=(int)allSectors_[sectorKey].size(); isec<sector; isec++)
 		allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,isec) );
 	    }
 
@@ -248,6 +248,7 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 	  double simCellSize(modIt->cellSize);         //Geant4 is in mm 
 	  double recoCellSize(recModIt->cellSize*10); //it comes in cm (CMS default)
 	  allSectors_[sectorKey][isec].setGeometry(modIt->h, modIt->bl, modIt->tl, simCellSize,recoCellSize);
+
 	  const HepGeom::Transform3D local2globalTr( trformIt->hr, trformIt->h3v );
 	  allSectors_[sectorKey][isec].setLocal2GlobalTransformation(local2globalTr);
 	  allSectors_[sectorKey][isec].configure(*fs_);    
@@ -285,7 +286,7 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
       std::pair<int,int> sectorKey(isd,layerKey);
       int sector=detId.sector();
       //int subSector=detId.subsector();
-          
+      
       if(allSectors_.find(sectorKey)==allSectors_.end()){
 	std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
 	continue;

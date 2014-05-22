@@ -45,7 +45,7 @@ def testSimHitsPos(fInUrl,accMap,sd,treeName='hgcSimHitsAnalyzer/HGC'):
       deltaPhi=TVector2.Phi_mpi_pi(phi-genPhi)
       deltaEta=eta-genEta
 
-      print deltaPhi,deltaEta
+      print genPhi,deltaPhi,genEta,deltaEta
 
   fin.Close()
 
