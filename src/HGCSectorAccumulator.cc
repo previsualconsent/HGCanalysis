@@ -23,13 +23,14 @@ HGCSectorAccumulator::~HGCSectorAccumulator()
 void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
 {
   //build the local -> global transformation
-  const CLHEP::HepRep3x3 rotation3x3 ( xx_, yx_, zx_, xy_, yy_, zy_, xz_, yz_, zz_ );
+  //const CLHEP::HepRep3x3 rotation3x3 ( xx_, yx_, zx_, xy_, yy_, zy_, xz_, yz_, zz_ );
+  const CLHEP::HepRep3x3 rotation3x3 ( xx_, xy_, xz_, yx_, yy_, yz_, zx_, zy_, zz_ );   //the inverse is the transpose
   const CLHEP::HepRotation rotationMatrix( rotation3x3 );
   const CLHEP::Hep3Vector translationVec( gx_, gy_, gz_);
   const HepGeom::Transform3D local2globalTr(rotationMatrix,translationVec);
-  
-  //cache global quantities
-  float rho=sqrt(pow(gx_,2)+pow(gy_,2));
+
+  //cache global quantities (deprecated)
+  //float rho=sqrt(pow(gx_,2)+pow(gy_,2));
 
   //init sim histos
   int ndivx=TMath::Floor(bl_/cell_);
@@ -44,25 +45,26 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
     {
       for(int ybin=1; ybin<gxH_->GetYaxis()->GetNbins(); ybin++)
 	{
+	  //the local coordinates
 	  float localX=gxH_->GetXaxis()->GetBinCenter(xbin);
-	  float rotLocalX=localX;	
 	  float localY=gxH_->GetYaxis()->GetBinCenter(ybin);
-  	  float rotLocalY=localY+rho;
 
-	  float gx = rotLocalX*(TMath::Cos(basePhi_)*xx_-TMath::Sin(basePhi_)*yx_) + rotLocalY*(TMath::Cos(basePhi_)*xy_-TMath::Sin(basePhi_)*yy_);
-	  gxH_->SetBinContent(xbin,ybin,gx);
+	  // by "hand" local to global
+  	  // 	  float rotLocalX=localX;	
+	  //   	  float rotLocalY=localY+rho;
+	  // 	  float gx = rotLocalX*(TMath::Cos(basePhi_)*xx_-TMath::Sin(basePhi_)*yx_) + rotLocalY*(TMath::Cos(basePhi_)*xy_-TMath::Sin(basePhi_)*yy_);
+	  // 	  gxH_->SetBinContent(xbin,ybin,gx);
+	  // 	  float gy = rotLocalX*(TMath::Sin(basePhi_)*xx_+TMath::Cos(basePhi_)*yx_) + rotLocalY*(TMath::Sin(basePhi_)*xy_+TMath::Cos(basePhi_)*yy_);
+	  // 	  gyH_->SetBinContent(xbin,ybin,gy);
+	  // 	  float gz = gz_;
+	  // 	  gzH_->SetBinContent(xbin,ybin,gz);
 
-	  float gy = rotLocalX*(TMath::Sin(basePhi_)*xx_+TMath::Cos(basePhi_)*yx_) + rotLocalY*(TMath::Sin(basePhi_)*xy_+TMath::Cos(basePhi_)*yy_);
-	  gyH_->SetBinContent(xbin,ybin,gy);
-
-	  float gz = gz_;
-	  gzH_->SetBinContent(xbin,ybin,gz);
-
+	  //local->global
 	  const HepGeom::Point3D<float> lcoord(localX,localY,0);
 	  const HepGeom::Point3D<float> gcoord( local2globalTr*lcoord );
-
-	  std::cout << "Previous method (" <<  gx << "," << gy << "," << gz << std::endl
-		    << "New method      (" <<  gcoord.x() << "," << gcoord.y() << "," << gcoord.z() << std::endl << std::endl;  
+	  gxH_->SetBinContent(xbin,ybin,gcoord.x());
+	  gyH_->SetBinContent(xbin,ybin,gcoord.y());
+	  gzH_->SetBinContent(xbin,ybin,gcoord.z());
 	}
     }
 
@@ -78,19 +80,28 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
     {
       for(int ybin=1; ybin<gxRecoH_->GetYaxis()->GetNbins(); ybin++)
 	{
+	  //local coordinates
 	  float localX=gxRecoH_->GetXaxis()->GetBinCenter(xbin);
-	  float rotLocalX=localX;	
 	  float localY=gxRecoH_->GetYaxis()->GetBinCenter(ybin);
-  	  float rotLocalY=localY+rho;
 
-	  float gx = rotLocalX*(TMath::Cos(basePhi_)*xx_-TMath::Sin(basePhi_)*yx_) + rotLocalY*(TMath::Cos(basePhi_)*xy_-TMath::Sin(basePhi_)*yy_);
-	  gxRecoH_->SetBinContent(xbin,ybin,gx);
+	  //by "hand" local to global
+	  // float rotLocalX=localX;	
+	  //   	  float rotLocalY=localY+rho;
+	  // 	  float gx = rotLocalX*(TMath::Cos(basePhi_)*xx_-TMath::Sin(basePhi_)*yx_) + rotLocalY*(TMath::Cos(basePhi_)*xy_-TMath::Sin(basePhi_)*yy_);
+	  // 	  gxRecoH_->SetBinContent(xbin,ybin,gx);
+	  // 	  float gy = rotLocalX*(TMath::Sin(basePhi_)*xx_+TMath::Cos(basePhi_)*yx_) + rotLocalY*(TMath::Sin(basePhi_)*xy_+TMath::Cos(basePhi_)*yy_);
+	  // 	  gyRecoH_->SetBinContent(xbin,ybin,gy);
+	  // 	  float gz = gz_;
+	  // 	  gzRecoH_->SetBinContent(xbin,ybin,gz);
 	  
-	  float gy = rotLocalX*(TMath::Sin(basePhi_)*xx_+TMath::Cos(basePhi_)*yx_) + rotLocalY*(TMath::Sin(basePhi_)*xy_+TMath::Cos(basePhi_)*yy_);
-	  gyRecoH_->SetBinContent(xbin,ybin,gy);
-	  
-	  float gz = gz_;
-	  gzRecoH_->SetBinContent(xbin,ybin,gz);
+	  //local->global
+	  const HepGeom::Point3D<float> lcoord(localX,localY,0);
+	  const HepGeom::Point3D<float> gcoord( local2globalTr*lcoord );
+	  gxRecoH_->SetBinContent(xbin,ybin,gcoord.x());
+	  gyRecoH_->SetBinContent(xbin,ybin,gcoord.y());
+	  gzRecoH_->SetBinContent(xbin,ybin,gcoord.z());
+
+
 	}
     }
 }
