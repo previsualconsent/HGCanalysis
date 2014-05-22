@@ -246,10 +246,21 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 	  //configure this specific sector
 	  int isec=sector-1;
 	  double simCellSize(modIt->cellSize);         //Geant4 is in mm 
-	  double recoCellSize(recModIt->cellSize*10); //it comes in cm (CMS default)
+	  double recoCellSize(recModIt->cellSize*10);  //it comes in cm (CMS default)
 	  allSectors_[sectorKey][isec].setGeometry(modIt->h, modIt->bl, modIt->tl, simCellSize,recoCellSize);
 
-	  const HepGeom::Transform3D local2globalTr( trformIt->hr, trformIt->h3v );
+	  //seems to be rotating always to 0?
+	  const CLHEP::Hep3Vector transl ( trformIt->h3v );
+	  const CLHEP::HepRotation hr(trformIt->hr);
+	  const HepGeom::Transform3D local2globalTr( hr, transl );
+
+	  //similar if the inverse is used?
+	  //const CLHEP::HepRep3x3 rotation ( trformIt->hr.xx(), trformIt->hr.xy(), trformIt->hr.xz(),
+	  //                                  trformIt->hr.yx(), trformIt->hr.yy(), trformIt->hr.yz(),
+	  //				      trformIt->hr.zx(), trformIt->hr.zy(), trformIt->hr.zz() );
+	  //const CLHEP::HepRotation hr ( rotation );
+	  //const HepGeom::Transform3D local2globalTr( hr, trformIt->h3v );
+
 	  allSectors_[sectorKey][isec].setLocal2GlobalTransformation(local2globalTr);
 	  allSectors_[sectorKey][isec].configure(*fs_);    
 	}
