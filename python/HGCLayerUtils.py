@@ -19,18 +19,21 @@ class LayerAccumulator:
                         
         #create the eta map
         newName=self.accumulator[0].GetName()
-        self.rhoMap=self.accumulator[0].Clone(newName.replace('E_','rho_'))
-        self.rhoMap.SetDirectory(0)
-        self.etaMap=self.accumulator[0].Clone(newName.replace('E_','eta_'))
-        self.etaMap.SetDirectory(0)
-        self.phiMap=self.accumulator[0].Clone(newName.replace('E_','phi_'))
-        self.phiMap.SetDirectory(0)
+        self.rhoMap={}
+        self.rhoMap[0]=self.accumulator[0].Clone(newName.replace('E_','rho_'))
+        self.rhoMap[0].SetDirectory(0)
+        self.etaMap={}
+        self.etaMap[0]=self.accumulator[0].Clone(newName.replace('E_','eta_'))
+        self.etaMap[0].SetDirectory(0)
+        self.phiMap={}
+        self.phiMap[0]=self.accumulator[0].Clone(newName.replace('E_','phi_'))
+        self.phiMap[0].SetDirectory(0)
 
-    def defineCoordinates(self, gxH, gyH, gzH):
+    def defineCoordinates(self, sector, gxH, gyH, gzH):
         
         #fill the eta map with the coordinates
-        for xbin in xrange(1,self.accumulator[0].GetXaxis().GetNbins()+1):
-            for ybin in xrange(1,self.accumulator[0].GetYaxis().GetNbins()+1):
+        for xbin in xrange(1,self.accumulator[sector].GetXaxis().GetNbins()+1):
+            for ybin in xrange(1,self.accumulator[sector].GetYaxis().GetNbins()+1):
                 x=gxH.GetBinContent(xbin,ybin)
                 y=gyH.GetBinContent(xbin,ybin)
                 z=gzH.GetBinContent(xbin,ybin)
@@ -38,19 +41,29 @@ class LayerAccumulator:
                 phi=TMath.ATan2(y,x)
                 eta=0
                 if rho>z: eta=0.5*TMath.Log( (rho+z)/(rho-z) )
-                self.rhoMap.SetBinContent(xbin,ybin,rho)
-                self.etaMap.SetBinContent(xbin,ybin,eta)
-                self.phiMap.SetBinContent(xbin,ybin,phi)
-                
+                self.rhoMap[sector].SetBinContent(xbin,ybin,rho)
+                self.etaMap[sector].SetBinContent(xbin,ybin,eta)
+                self.phiMap[sector].SetBinContent(xbin,ybin,phi)
+        
     def getGlobalCoordinates(self,sector,ibin):
         xbin,ybin,zbin = ROOT.Long(), ROOT.Long(), ROOT.Long()
-        self.rhoMap.GetBinXYZ(ibin,xbin,ybin,zbin)
-        return self.rhoMap.GetBinContent(xbin,ybin),self.etaMap.GetBinContent(xbin,ybin),self.phiMap.GetBinContent(xbin,ybin)
+        self.rhoMap[sector].GetBinXYZ(ibin,xbin,ybin,zbin)
+        return self.rhoMap[sector].GetBinContent(xbin,ybin),self.etaMap[sector].GetBinContent(xbin,ybin),self.phiMap[sector].GetBinContent(xbin,ybin)
                     
-    def addSector(self, sector):
+    def addSector(self, sector, gxH, gyH, gzH):
         if sector==0: return
         self.accumulator[sector]=self.accumulator[0].Clone('E_accumulator_%d_%d'%(self.layer,sector)) 
         self.accumulator[sector].SetDirectory(0)
+        self.rhoMap[sector]=self.rhoMap[0].Clone('rho_accumulator_%d_%d'%(self.layer,sector))
+        self.rhoMap[sector].SetDirectory(0)
+        self.rhoMap[sector].Reset('ICE')
+        self.etaMap[sector]=self.etaMap[0].Clone('eta_accumulator_%d_%d'%(self.layer,sector))
+        self.etaMap[sector].SetDirectory(0)
+        self.etaMap[sector].Reset('ICE')
+        self.phiMap[sector]=self.phiMap[0].Clone('phi_accumulator_%d_%d'%(self.layer,sector))
+        self.phiMap[sector].SetDirectory(0)
+        self.phiMap[sector].Reset('ICE')
+        self.defineCoordinates(sector,gxH,gyH,gzH)
 
     def reset(self) :
         for sector in self.accumulator:
@@ -77,10 +90,9 @@ def readSectorHistogramsFrom(fInUrl,sd,baseDir='hgcSimHitsAnalyzer'):
         layer=int(sectorInfo[2])
         sector=int(sectorInfo[3])
         if layer in accumulatorsMap:
-            accumulatorsMap[layer].addSector(sector)
+            accumulatorsMap[layer].addSector( sector, fIn.Get(baseDir+'/gx_'+keyName) ,fIn.Get(baseDir+'/gy_'+keyName), fIn.Get(baseDir+'/gz_'+keyName) )
         else:
             accumulatorsMap[ layer ] = LayerAccumulator( fIn.Get(baseDir+'/E_'+keyName), layer )
-            accumulatorsMap[ layer ].defineCoordinates( fIn.Get(baseDir+'/gx_'+keyName), fIn.Get(baseDir+'/gy_'+keyName), fIn.Get(baseDir+'/gz_'+keyName) )
     fIn.Close()
 
     #all done here

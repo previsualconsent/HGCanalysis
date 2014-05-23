@@ -116,7 +116,7 @@ def main():
     #plot formatting
     customROOTstyle()
     #gROOT.SetBatch(True)
-    #gROOT.SetBatch(False)
+    gROOT.SetBatch(False)
     gStyle.SetPalette(55)
     
     accMap=readSectorHistogramsFrom(fInUrl=opt.input,sd=opt.sd)

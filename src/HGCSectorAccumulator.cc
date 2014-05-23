@@ -42,6 +42,10 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
 	  //local->global (mm to cm) 
 	  const HepGeom::Point3D<float> lcoord(localX/10,localY/10,0);
 	  const HepGeom::Point3D<float> gcoord( local2globalTr_*lcoord );
+
+	  if(xbin==gxH_->GetXaxis()->FindBin(0.) && ybin==gxH_->GetYaxis()->FindBin(0.))
+	    std::cout << localX << " " << localY << " -> " <<  gcoord.x() << " " << gcoord.y() << std::endl;
+
 	  gxH_->SetBinContent(xbin,ybin,gcoord.x()*10);
 	  gyH_->SetBinContent(xbin,ybin,gcoord.y()*10);
 	  gzH_->SetBinContent(xbin,ybin,gcoord.z()*10);
