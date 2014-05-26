@@ -21,6 +21,18 @@ process.load('Configuration.StandardSequences.Digi_cff')
 process.load('Configuration.StandardSequences.SimL1Emulator_cff')
 process.load('Configuration.StandardSequences.DigiToRaw_cff')
 
+#customize geometry
+geometry=XXX_GEOM_XXX
+geometryPostFix=''
+for item in process.XMLIdealGeometryESSource.geomXMLFiles :
+	if geometry=='OnlyHGCEE':
+		geometryPostFix='_onlyEE'
+	if geometry=='OnlyHGCHEback':
+		geometryPostFix='_onlyHEback'
+	if geometry=='OnlyHGCHEfront':
+		geometryPostFix='_onlyHEfront'
+process.XMLIdealGeometryESSource.geomXMLFiles = customGeomXMLFiles
+	
 process.maxEvents = cms.untracked.PSet(
     input = cms.untracked.int32(250)
 )
