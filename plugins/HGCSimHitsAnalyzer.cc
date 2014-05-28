@@ -180,8 +180,13 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 		      simEvt_.hit_x[simEvt_.nhits]=pos.X();
 		      simEvt_.hit_y[simEvt_.nhits]=pos.Y();
 		      simEvt_.hit_z[simEvt_.nhits]=pos.Z();
-		      simEvt_.hit_eta[simEvt_.nhits]=pos.Eta();
-		      simEvt_.hit_phi[simEvt_.nhits]=pos.Phi();
+		      float rho=TMath::Sqrt(x*x+y*y+z*z);
+		      float phi=TMath::ATan2(y,x);
+		      float eta=0;
+		      if (rho>z) eta=0.5*TMath::Log( (rho+z)/(rho-z) );
+		      else std::cout << "HGCSimHitsAnalyser hit @ " << it->first.second << " sector#" << isec << " has rho=" <<rho << " and z=" << z << "?" << endl;
+		      simEvt_.hit_eta[simEvt_.nhits]=eta;
+		      simEvt_.hit_phi[simEvt_.nhits]=phi;
 		    }
 		  simEvt_.nhits++;
 		}
