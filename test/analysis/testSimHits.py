@@ -67,7 +67,7 @@ class HitIntegrator:
 """
 produces simple validation plots of the position of the sim hits for a particle gun sample
 """
-def integrateSimHits(fInUrl,accMap,treeName='hgcSimHitsAnalyzer/HGC'):
+def integrateSimHits(fInUrl,fout,accMap,treeName='hgcSimHitsAnalyzer/HGC'):
 
   customROOTstyle()
   gROOT.SetBatch(False)
@@ -75,15 +75,13 @@ def integrateSimHits(fInUrl,accMap,treeName='hgcSimHitsAnalyzer/HGC'):
 
   hitIntegrator=HitIntegrator()
 
-  fout = ROOT.TFile("output.root", "RECREATE")
   fout.cd()
-  output_tuple = ROOT.TNtuple("HGC","HGC","genPt:genEta:genPhi"":".join(hitIntegrator.getVarNames()))
-
+  output_tuple = ROOT.TNtuple("HGC","HGC","genPt:genEta:genPhi:"+":".join(hitIntegrator.getVarNames()))
+  output_tuple.SetDirectory(fout)
+  
   #loop over events
   HGC=ROOT.TChain(treeName)
-  for f in fInUrl:
-    print f
-    HGC.Add(f)
+  HGC.Add(fInUrl)
   for iev in xrange(0,HGC.GetEntries()):
     HGC.GetEntry(iev)
 
@@ -115,13 +113,13 @@ def integrateSimHits(fInUrl,accMap,treeName='hgcSimHitsAnalyzer/HGC'):
       hitIntegrator.integrateHit(sdType,abs(layer),edep,deltaEta,deltaPhi)
 
     varVals=[genPt,genEta,genPhi]+hitIntegrator.getVarVals()
+    #print varVals
     output_tuple.Fill(array.array("f",varVals))
+    if iev%5000 : output_tuple.AutoSave('SaveSelf')
 
-
-  #close the output
+  #write the ntuple
   fout.cd()
   output_tuple.Write()
-  fout.Close()
 
 """
 checks the input arguments and steers the analysis
@@ -156,7 +154,13 @@ def main():
              2 : readSectorHistogramsFrom(fInUrl=fInUrl[0],sd=2) }
 
     #run analysis
-    integrateSimHits(fInUrl=fInUrl,accMap=accMap)
+    ifile=0
+    for f in fInUrl:
+      ifile=ifile+1
+      print ifile,f
+      fout = ROOT.TFile("%s_%d.root"%(opt.tag,ifile), "RECREATE")
+      integrateSimHits(fInUrl=f,fout=fout,accMap=accMap)
+      fout.Close()
 
 if __name__ == "__main__":
     main()

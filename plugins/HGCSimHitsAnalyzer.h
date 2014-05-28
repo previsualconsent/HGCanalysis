@@ -56,6 +56,7 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   std::vector<std::string> hitCollections_, digiCollections_;
   std::vector<std::string> sdTags_;
   std::string genSource_;
+  bool addGlobalPos_;
 
   std::vector<HGCNumberingScheme *> numberingSchemes_;
 

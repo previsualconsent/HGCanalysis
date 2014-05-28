@@ -38,7 +38,8 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   hitCollections_  = iConfig.getUntrackedParameter< std::vector<std::string> >("hitCollections");
   digiCollections_ = iConfig.getUntrackedParameter< std::vector<std::string> >("digiCollections");
   sdTags_          = iConfig.getUntrackedParameter< std::vector<std::string> >("sdTags");
-  
+  addGlobalPos_    = iConfig.getUntrackedParameter< bool > ("addGlobalPos");
+
   edm::Service<TFileService> fs;
   fs_=&fs;
   t_=fs->make<TTree>("HGC","Event Summary");
@@ -61,6 +62,16 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   t_->Branch("hit_bin",    simEvt_.hit_bin,    "hit_bin[nhits]/I");
   t_->Branch("hit_edep",   simEvt_.hit_edep,   "hit_edep[nhits]/F");
   t_->Branch("hit_avgt",   simEvt_.hit_avgt,   "hit_avgt[nhits]/F");
+
+  if(addGlobalPos_)
+    {
+      t_->Branch("hit_x",   simEvt_.hit_x,   "hit_x[nhits]/F");
+      t_->Branch("hit_y",   simEvt_.hit_y,   "hit_y[nhits]/F");
+      t_->Branch("hit_z",   simEvt_.hit_z,   "hit_z[nhits]/F");
+      t_->Branch("hit_eta",   simEvt_.hit_eta,   "hit_eta[nhits]/F");
+      t_->Branch("hit_phi",   simEvt_.hit_phi,   "hit_phi[nhits]/F");
+    }
+
 
   t_->Branch("ndigis",    &simEvt_.ndigis,     "ndigis/I");
   t_->Branch("digi_type",  simEvt_.digi_type,  "digi_type[ndigis]/I");
@@ -163,6 +174,15 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 		  simEvt_.hit_bin  [simEvt_.nhits]=accH->GetBin(xbin,ybin);
 		  simEvt_.hit_edep [simEvt_.nhits]=edep;
 		  simEvt_.hit_avgt [simEvt_.nhits]=edep > 0. ? tH->GetBinContent(xbin,ybin)/edep : 0.;
+		  if(addGlobalPos_)
+		    {
+		      TVector3 pos=(it->second)[isec].getGlobalPointAt( simEvt_.hit_bin  [simEvt_.nhits] );
+		      simEvt_.hit_x[simEvt_.nhits]=pos.X();
+		      simEvt_.hit_y[simEvt_.nhits]=pos.Y();
+		      simEvt_.hit_z[simEvt_.nhits]=pos.Z();
+		      simEvt_.hit_eta[simEvt_.nhits]=pos.Eta();
+		      simEvt_.hit_phi[simEvt_.nhits]=pos.Phi();
+		    }
 		  simEvt_.nhits++;
 		}
 	    }  	    

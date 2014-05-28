@@ -43,6 +43,7 @@ process.hgcSimHitsAnalyzer = cms.EDAnalyzer("HGCSimHitsAnalyzer",
                                             digiCollections = cms.untracked.vstring('HGCDigisEE',      'HGCDigisHEfront',          'HGCDigisHEback'              ),
                                             sdTags          = cms.untracked.vstring('HGCalEESensitive','HGCalHESiliconSensitive',  'HGCalHEScintillatorSensitive'),
                                             genSource       = cms.untracked.string("genParticles"),
+                                            addGlobalPos    = cms.untracked.bool(True)
                                             )
 
 process.p = cms.Path(process.hgcSimHitsAnalyzer)

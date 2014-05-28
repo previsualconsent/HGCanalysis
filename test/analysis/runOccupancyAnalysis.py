@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import sys
 import optparse
 import commands
@@ -13,9 +14,33 @@ from UserCode.HGCanalysis.HGCLayerUtils import *
 from ROOT import *
 
 """
+Marcello's algorithm
+"""
+def dataBitsToSend(eta,nMips):
+    if nMips==0 : return 0,0
+    nBits=0
+    region=0
+    if eta<2.0:
+        region=1
+        if nMips<4:    nBits=1
+        elif nMips<10: nBits=4+2
+        else:          nBits=10
+    elif eta<2.5:
+        region=2
+        if nMips<10:   nBits=1
+        elif nMips<96: nBits=4+2
+        else:          nBits=10
+    else:
+        region=3
+        if nMips<25:    nBits=1
+        elif nMips<192: nBits=4+2
+        else:           nBits=10
+    return nBits,region
+
+"""
 loops over the events and collects the electron energies
 """
-def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,noiseScale=0.0,mipEn=60,treeName='hgcSimHitsAnalyzer/HGC') :
+def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,noiseScale=0.0,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
 
     noiseSigma={0:0.075*noiseScale,
                 1:0.3  *noiseScale,
@@ -27,20 +52,15 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
         noiseSigma[2]=noiseSigma[3]
         noiseSigma[3]=16*noiseSigma[0]
         
-    thresholds=[0.4,1.0,2.0,5.0,10.0,25.0]
-    etaVsEnergyPerLayer={}
-    etaVsEnergy={}
-    for cell in [0,1,2,3]:
-        etaVsEnergy[cell]=ROOT.TH2F('espec_cell%d'%cell,';Pseudo-rapidity;Energy / MIP',15,1.5,3.0,500,0,20)
-        etaVsEnergy[cell].SetDirectory(0)
+    
+    dataVolumePerLayer={}
 
     #prepare output
-    foutUrl='occprofiles_pu%d_sd%d_noise%3.1f.root'%(avgPU,sdType,noiseScale)
+    foutUrl=os.path.basename(url)
+    foutUrl=foutUrl.replace('.root','_occ_pu%d_sd%d.root'%(avgPU,sdType))
     fout=TFile.Open(foutUrl,'RECREATE')
-    tupleVars="layer:eta:cell:n"
-    for thr in thresholds : tupleVars=tupleVars+':n_%d'%(thr*10)
-    outTuple = ROOT.TNtuple("occ","occ",tupleVars)
-
+    outTuple = ROOT.TNtuple("occ","occ","event:layer:cell:eta:edep:edepRing")
+                            
     #analyze generated minimum bias events
     fin=TFile.Open(url)
     Events=fin.Get(treeName)
@@ -71,97 +91,107 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
 
                 #layer and sector info
                 layer=Events.hit_layer[idep]
-                sector=Events.hit_sec[idep]-1
+                sector=Events.hit_sec[idep]
 
                 #add
-                edep=Events.hit_edep[idep]*1e6/mipEn
+                edep=Events.hit_edep[idep]*1e6 #/mipEn
                 bin=Events.hit_bin[idep]
 
                 if sector<0: continue
                 accMap[layer].fill(edep,bin,sector)
 
-                
-        #integrate up to 4x4 cells to determine energy deposits
-        #  _______________________________
-        # | (0,3)   (1,3)   (2,3)   (3,3) |
-        # |_______________________        |
-        # | (0,2)   (1,2)   (2,2) | (3,2) |
-        # |_______________        |       |
-        # | (0,1)   (1,1) | (2,1) | (3,1) |
-        # |_______        |       |       |
-        # | (0,0) | (1,0) | (2,0) | (3,0) |
-        # |_______________________________|
-        #
+
+        #check what has been accumulated
         for layer in accMap:
-            if layer<0: continue
 
-            accMap[layer].accumulator[0].Draw('colz')
-            raw_input()
-            
-            xbin=accMap[layer].accumulator[0].GetXaxis().FindBin(0)
-            for ybin in xrange(1,accMap[layer].accumulator[0].GetYaxis().GetNbins()-4,4):
+            #accMap[layer].accumulator[0].Draw('colz')
+            #raw_input()
 
-                for sector in accMap[layer].accumulator:
-                    enAcc=[]
+            #data volume estimate
+            #for each cell compute the number of bits to send and integrate for a sector or specific eta's
+            #if not (layer in dataVolumePerLayer):
+            #    dataVolumePerLayer[layer]={}
+            #    for reg in [0,1,2,3]:
+            #       dataVolumePerLayer[layer][reg]=ROOT.TH1F('datavol_layer%d_reg_%d'%(layer,reg),';Data volume/bunch crossing (kb);Events x 20^{o} sector;',200,0,2)
+            #        dataVolumePerLayer[layer][reg].SetDirectory(0)
+            #for sector in accMap[layer].accumulator:
+            #    totalBits={0:0,1:0,2:0,3:0}
+            #    for ybin in xrange(1,accMap[layer].accumulator[sector].GetYaxis().GetNbins()+1):
+            #        for xbin in xrange(1,accMap[layer].accumulator[sector].GetXaxis().GetNbins()+1):
+            #            bitsToSend,ireg=dataBitsToSend( accMap[layer].etaMap[sector].GetBinContent(xbin,ybin), accMap[layer].accumulator[sector].GetBinContent(xbin,ybin) )
+            #            if ireg==0 : continue
+            #            totalBits[ireg]=totalBits[ireg]+bitsToSend
+            #            totalBits[0]=totalBits[0]+bitsToSend
+            #    for ireg in totalBits:
+            #        dataVolumePerLayer[layer][ireg].Fill(float(totalBits[ireg])/1024.)
 
-                    #accMap[layer].accumulator[sector].Draw('colz')
-                    totalEp_pos,totalEm_pos,totalEp_neg,totalEm_neg=0,0,0,0
-                    totalEta,totalArea=0,0
-                    for xStep,yStep in [[0,0],
-                                        [0,1],[1,0],[1,1],
-                                        [0,2],[1,2],[2,0],[2,1],[2,2],
-                                        [0,3],[1,3],[2,3],[3,0],[3,1],[3,2],[3,3]]:
+            #occupancy estimate
+            #integrate up to 3x3 cells with increasing size (multiple of the base bin width)
+            #and determine energy deposits and isolation
+            #  _______________________ 
+            # | (0,2)   (1,2)   (2,2) |
+            # |       ________        |
+            # | (0,1) | (1,1) | (2,1) |
+            # |       ________|       |
+            # | (0,0)   (1,0)   (2,0) | 
+            # |_______________________|
+            #
+            #circulate over the sectors
+            for sector in accMap[layer].accumulator :
+                
+                binWidth=accMap[layer].accumulator[sector].GetXaxis().GetBinWidth(1)
 
-                        #positive x
-                        totalEp_pos=totalEp_pos+accMap[layer].accumulator[sector].GetBinContent(xbin+xStep,ybin+yStep)
-                        totalEm_pos=totalEm_pos+accMap[-layer].accumulator[sector].GetBinContent(xbin+xStep,ybin+yStep)
+                #test different cell sizes
+                for cellSize in [binWidth,2*binWidth,3*binWidth]:
+                
+                    halfStep=3*cellSize/2.
+                    nCellsToInteg=int(halfStep/binWidth)+2
+                
+                    #probe at +/-x
+                    for centerX in [-2*cellSize,2*cellSize]:
+                        centerXbin=accMap[layer].accumulator[sector].GetXaxis().FindBin(centerX)
+                        centerY=accMap[layer].accumulator[sector].GetYaxis().GetXmin()+2*cellSize
 
-                        #negative x
-                        totalEp_neg=totalEp_neg+accMap[layer].accumulator[sector].GetBinContent(xbin-1-xStep,ybin+yStep)
-                        totalEm_neg=totalEm_neg+accMap[-layer].accumulator[sector].GetBinContent(xbin-1-xStep,ybin+yStep)
+                        #go up in y
+                        while centerY<accMap[layer].accumulator[sector].GetYaxis().GetXmax()-2*cellSize:
 
-                        #eta for the integrated cell
-                        totalEta=totalEta+accMap[layer].etaMap.GetBinContent(xbin+xStep,ybin+yStep)
+                            centerYbin=accMap[layer].accumulator[sector].GetYaxis().FindBin(centerY)
 
-                        #total area integrated
-                        totalArea=totalArea+accMap[layer].accumulator[sector].GetXaxis().GetBinWidth(xbin+xStep)
+                            eta=0
+                            nCellsInteg, nNeighbourCellsInteg=0,0
+                            totalInCell,totalInNeighbours=0,0
+                            for iXbin in xrange(-nCellsToInteg,nCellsToInteg):
+                                for iYbin in xrange(-nCellsToInteg,nCellsToInteg):
+                                    edep=accMap[layer].accumulator[sector].GetBinContent(centerXbin+iXbin,centerYbin+iYbin)
+                                    ix=accMap[layer].accumulator[sector].GetXaxis().GetBinCenter(centerXbin+iXbin)
+                                    iy=accMap[layer].accumulator[sector].GetYaxis().GetBinCenter(centerYbin+iYbin)
 
-                        #save at the edges
-                        if xStep==yStep: enAcc.append( [xStep,
-                                                        totalEta/((xStep+1)*(yStep+1)),
-                                                        totalArea,
-                                                        [totalEm_pos,totalEp_pos,totalEm_neg,totalEp_neg]] )
+                                    #discard if outside the required range
+                                    if TMath.Abs(ix-centerX)>halfStep or TMath.Abs(iy-centerY)>halfStep :
+                                        continue
+                                    elif TMath.Abs(ix-centerX)<cellSize/2 and TMath.Abs(iy-centerY)<cellSize/2 :
+                                        totalInCell=totalInCell+edep
+                                        nCellsInteg=nCellsInteg+1
+                                        eta=eta+accMap[layer].etaMap[sector].GetBinContent(centerXbin+iXbin,centerYbin+iYbin)
+                                    else:
+                                        totalInNeighbours=totalInNeighbours+edep
+                                        nNeighbourCellsInteg=nNeighbourCellsInteg+1
+                                        
+                            #move up
+                            centerY=centerY+2*halfStep
 
-                    #fill the energy spectra histograms
-                    print ybin,sector,enAcc[0][3]
-                    for accStep in enAcc:
-                        cell=accStep[0]
-                        eta=accStep[1]
-                        for en in accStep[3]:
-                            noise=ROOT.gRandom.Gaus(0,noiseSigma[cell])
-                            if noise<0: noise=0
-                            etaVsEnergy[cell].Fill(eta,en+noise)
+                            #no noise for the moment
+                            # noise=ROOT.gRandom.Gaus(0,noiseSigma[cell])
 
-            for cell in etaVsEnergy:
-                #etaVsEnergy[cell].Draw('colz')
-                if not (layer in etaVsEnergyPerLayer):
-                    etaVsEnergyPerLayer[layer]={}
-                if not (cell in etaVsEnergyPerLayer[layer]):
-                    etaVsEnergyPerLayer[layer][cell]=etaVsEnergy[cell].Clone('espec_layer%d_cell%d'%(layer,cell))
-                    etaVsEnergyPerLayer[layer][cell].SetDirectory(0)
-                etaVsEnergyPerLayer[layer][cell].Add(etaVsEnergy[cell])
+                            #if something has been integrated analyse it
+                            if nCellsInteg==0: continue
 
-                #now project for each eta and save in a smaller ntuple
-                for etaBin in xrange(1,etaVsEnergy[cell].GetXaxis().GetNbins()+1):
-                    pyH=etaVsEnergy[cell].ProjectionY("py",etaBin,etaBin)
-                    n=pyH.Integral()
-                    eta=etaVsEnergy[cell].GetXaxis().GetBinCenter(etaBin)
-                    if eta>3 : continue
-                    varsToFill=[layer,eta,cell,n]
-                    for thr in thresholds:
-                        startBin=pyH.GetXaxis().FindBin(thr)
-                        varsToFill.append( pyH.Integral(startBin,pyH.GetXaxis().GetNbins()+1) )
-                    outTuple.Fill(array("f",varsToFill))
+                            #average eta of this cell
+                            eta=eta/nCellsInteg
+
+                            #fill ntuple
+                            varsToFill=[iSetCtr,layer,cellSize/binWidth,eta,totalInCell,totalInNeighbours]
+                            outTuple.Fill(array("f",varsToFill))                        
 
             #all done with this layer
             accMap[layer].reset()
@@ -171,10 +201,10 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
     
     #save profiles obtained as function of y and y->eta map
     fout.cd()
-    for layer in etaVsEnergyPerLayer:
-        for cell in etaVsEnergyPerLayer[layer]:
-            etaVsEnergyPerLayer[layer][cell].SetDirectory(fout)
-            etaVsEnergyPerLayer[layer][cell].Write()
+    #for layer in dataVolumePerLayer:
+    #    for reg in dataVolumePerLayer[layer]:
+    #        dataVolumePerLayer[layer][reg].SetDirectory(fout)
+    #        dataVolumePerLayer[layer][reg].Write()        
     outTuple.Write()
     fout.Close()
     print 'Results stored in %s'%foutUrl
