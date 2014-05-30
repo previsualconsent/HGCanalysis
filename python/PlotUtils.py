@@ -4,11 +4,12 @@ import ROOT
 
 """
 class MyPaveText(ROOT.TPaveText):
-    def __init__(self,title,x1=0.1,y1=0.95,x2=0.6,y2=0.99):
+    def __init__(self,title,x1=0.12,y1=0.95,x2=0.6,y2=0.99):
         ROOT.TPaveText.__init__(self,x1,y1,x2,y2,'brNDC')
         self.SetFillStyle(0)
         self.SetBorderSize(0)
         self.SetTextAlign(12)
+        self.SetTextFont(42)
         self.SetTextSize(0.04)
         for t in title.split('\\') : self.AddText(t)
         self.Draw()
@@ -21,9 +22,9 @@ def customROOTstyle() :
     ROOT.gROOT.SetBatch(True)
     ROOT.gStyle.SetOptTitle(False)
     ROOT.gStyle.SetOptStat(False)
-    ROOT.gStyle.SetPadTopMargin(0.1);
+    ROOT.gStyle.SetPadTopMargin(0.06);
     ROOT.gStyle.SetPadBottomMargin(0.13);
-    ROOT.gStyle.SetPadLeftMargin(0.15);
+    ROOT.gStyle.SetPadLeftMargin(0.12);
     ROOT.gStyle.SetPadRightMargin(0.02);
     ROOT.gStyle.SetLabelColor(1, "XYZ");
     ROOT.gStyle.SetLabelFont(42, "XYZ");
@@ -47,3 +48,25 @@ def customROOTstyle() :
     ROOT.gStyle.SetFrameLineColor(1);
     ROOT.gStyle.SetFrameLineStyle(1);
     ROOT.gStyle.SetFrameLineWidth(1);
+
+"""
+Add overflows to the bins
+"""
+def fixExtremities(h):
+   
+    fbin = h.GetBinContent(0) + h.GetBinContent(1);
+    fbine = ROOT.TMath.Sqrt(h.GetBinError(0)*h.GetBinError(0)
+                            + h.GetBinError(1)*h.GetBinError(1))
+    h.SetBinContent(1,fbin)
+    h.SetBinError(1,fbine)
+    h.SetBinContent(0,0)
+    h.SetBinError(0,0)
+
+    nbins = h.GetNbinsX()
+    fbin = h.GetBinContent(nbins) + h.GetBinContent(nbins+1)
+    fbine = ROOT.TMath.Sqrt(h.GetBinError(nbins)*h.GetBinError(nbins)
+                          + h.GetBinError(nbins+1)*h.GetBinError(nbins+1))
+    h.SetBinContent(nbins,fbin)
+    h.SetBinError(nbins,fbine)
+    h.SetBinContent(nbins+1,0)
+    h.SetBinError(nbins+1,0)

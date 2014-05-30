@@ -14,30 +14,6 @@ from UserCode.HGCanalysis.HGCLayerUtils import *
 from ROOT import *
 
 """
-Marcello's algorithm
-"""
-def dataBitsToSend(eta,nMips):
-    if nMips==0 : return 0,0
-    nBits=0
-    region=0
-    if eta<2.0:
-        region=1
-        if nMips<4:    nBits=1
-        elif nMips<10: nBits=4+2
-        else:          nBits=10
-    elif eta<2.5:
-        region=2
-        if nMips<10:   nBits=1
-        elif nMips<96: nBits=4+2
-        else:          nBits=10
-    else:
-        region=3
-        if nMips<25:    nBits=1
-        elif nMips<192: nBits=4+2
-        else:           nBits=10
-    return nBits,region
-
-"""
 loops over the events and collects the electron energies
 """
 def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,noiseScale=0.0,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
