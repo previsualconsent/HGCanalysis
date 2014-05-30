@@ -59,7 +59,7 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
     foutUrl=os.path.basename(url)
     foutUrl=foutUrl.replace('.root','_occ_pu%d_sd%d.root'%(avgPU,sdType))
     fout=TFile.Open(foutUrl,'RECREATE')
-    outTuple = ROOT.TNtuple("occ","occ","event:layer:cell:eta:edep:edepRing")
+    outTuple = ROOT.TNtuple("occ","occ","event:layer:cell:area:eta:e_sr0:e_sr1:e_sr2")
                             
     #analyze generated minimum bias events
     fin=TFile.Open(url)
@@ -67,6 +67,9 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
     
     #generate pileup sets
     evRanges=generateInTimePUSets(Events.GetEntriesFast(),avgPU)
+
+    #useful to integrate over different cells
+    cellInteg=CellIntegrator()
     
     #iterate over events
     iSetCtr=0
@@ -96,10 +99,12 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
                 #add
                 edep=Events.hit_edep[idep]*1e6 #/mipEn
                 bin=Events.hit_bin[idep]
-
+                
                 if sector<0: continue
-                accMap[layer].fill(edep,bin,sector)
-
+                try:
+                    accMap[layer].fill(edep,bin,sector)
+                except:
+                    pass
 
         #check what has been accumulated
         for layer in accMap:
@@ -138,60 +143,38 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
             #
             #circulate over the sectors
             for sector in accMap[layer].accumulator :
-                
+
                 binWidth=accMap[layer].accumulator[sector].GetXaxis().GetBinWidth(1)
 
                 #test different cell sizes
-                for cellSize in [binWidth,2*binWidth,3*binWidth]:
-                
-                    halfStep=3*cellSize/2.
-                    nCellsToInteg=int(halfStep/binWidth)+2
-                
-                    #probe at +/-x
-                    for centerX in [-2*cellSize,2*cellSize]:
-                        centerXbin=accMap[layer].accumulator[sector].GetXaxis().FindBin(centerX)
-                        centerY=accMap[layer].accumulator[sector].GetYaxis().GetXmin()+2*cellSize
+                for cell in [1,2,3]:
 
-                        #go up in y
-                        while centerY<accMap[layer].accumulator[sector].GetYaxis().GetXmax()-2*cellSize:
+                    centerX    = 0
+                    centerXbin = accMap[layer].accumulator[sector].GetXaxis().FindBin(centerX)+cellInteg.center[cell][0]-1
+                    centerX    = accMap[layer].accumulator[sector].GetXaxis().GetBinCenter(centerXbin)
 
-                            centerYbin=accMap[layer].accumulator[sector].GetYaxis().FindBin(centerY)
+                    startY     = accMap[layer].accumulator[sector].GetYaxis().GetXmin()
+                    startYbin  = accMap[layer].accumulator[sector].GetYaxis().FindBin(startY)+cellInteg.center[cell][1]-1
+                    startY     = accMap[layer].accumulator[sector].GetYaxis().GetBinCenter(startYbin)
 
-                            eta=0
-                            nCellsInteg, nNeighbourCellsInteg=0,0
-                            totalInCell,totalInNeighbours=0,0
-                            for iXbin in xrange(-nCellsToInteg,nCellsToInteg):
-                                for iYbin in xrange(-nCellsToInteg,nCellsToInteg):
-                                    edep=accMap[layer].accumulator[sector].GetBinContent(centerXbin+iXbin,centerYbin+iYbin)
-                                    ix=accMap[layer].accumulator[sector].GetXaxis().GetBinCenter(centerXbin+iXbin)
-                                    iy=accMap[layer].accumulator[sector].GetYaxis().GetBinCenter(centerYbin+iYbin)
+                    for centerYbin in xrange(startYbin,accMap[layer].accumulator[sector].GetYaxis().GetNbins()-cellInteg.step[cell],cellInteg.step[cell]):
+                        
+                        nCellsInteg = {0:0, 1:0, 2:0 }
+                        totalInCell = {0:0.,1:0.,2:0.}
+                        etaInCell   = {0:0.,1:0.,2:0.}
+                        for iXbin in xrange(cellInteg.integRange[cell][0],cellInteg.integRange[cell][1]+1):
+                            for iYbin in xrange(cellInteg.integRange[cell][0],cellInteg.integRange[cell][1]+1):
+                                srNumber=cellInteg.getSRNumber(iXbin,iYbin,cell)
+                                nCellsInteg[srNumber] = nCellsInteg[srNumber] + 1
+                                totalInCell[srNumber] = totalInCell[srNumber] + accMap[layer].accumulator[sector].GetBinContent(centerXbin+iXbin,centerYbin+iYbin)
+                                etaInCell[srNumber]   = etaInCell[srNumber]   + accMap[layer].etaMap[sector].GetBinContent(centerXbin+iXbin,centerYbin+iYbin)
 
-                                    #discard if outside the required range
-                                    if TMath.Abs(ix-centerX)>halfStep or TMath.Abs(iy-centerY)>halfStep :
-                                        continue
-                                    elif TMath.Abs(ix-centerX)<cellSize/2 and TMath.Abs(iy-centerY)<cellSize/2 :
-                                        totalInCell=totalInCell+edep
-                                        nCellsInteg=nCellsInteg+1
-                                        eta=eta+accMap[layer].etaMap[sector].GetBinContent(centerXbin+iXbin,centerYbin+iYbin)
-                                    else:
-                                        totalInNeighbours=totalInNeighbours+edep
-                                        nNeighbourCellsInteg=nNeighbourCellsInteg+1
-                                        
-                            #move up
-                            centerY=centerY+2*halfStep
+                        #no noise for the moment
+                        # noise=ROOT.gRandom.Gaus(0,noiseSigma[cell])
 
-                            #no noise for the moment
-                            # noise=ROOT.gRandom.Gaus(0,noiseSigma[cell])
-
-                            #if something has been integrated analyse it
-                            if nCellsInteg==0: continue
-
-                            #average eta of this cell
-                            eta=eta/nCellsInteg
-
-                            #fill ntuple
-                            varsToFill=[iSetCtr,layer,cellSize/binWidth,eta,totalInCell,totalInNeighbours]
-                            outTuple.Fill(array("f",varsToFill))                        
+                        #fill ntuple
+                        varsToFill=[iSetCtr,layer,cell,TMath.Power(cell*binWidth,2),etaInCell[0]/nCellsInteg[0],totalInCell[0],totalInCell[1],totalInCell[2]]
+                        outTuple.Fill(array("f",varsToFill))                        
 
             #all done with this layer
             accMap[layer].reset()
@@ -229,10 +212,10 @@ def main():
         sys.exit(1)
 
     #plot formatting
-    #customROOTstyle()
+    customROOTstyle()
     #gROOT.SetBatch(True)
-    #gROOT.SetBatch(False)
-    #gStyle.SetPalette(55)
+    gROOT.SetBatch(False)
+    gStyle.SetPalette(55)
     
     accMap=readSectorHistogramsFrom(fInUrl=opt.input,sd=opt.sd)
     runOccupancyAnalysis(accMap,url=opt.input,avgPU=opt.pu,sdType=opt.sd,noiseScale=opt.noiseScale)

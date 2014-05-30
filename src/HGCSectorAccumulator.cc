@@ -31,6 +31,9 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
   gxH_   = fs->make<TH2F>(TString("gx_")   +id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-cell_*ndivx,cell_*ndivx,2*ndivy,-cell_*ndivy,cell_*ndivy);
   gyH_   = fs->make<TH2F>(TString("gy_")   +id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-cell_*ndivx,cell_*ndivx,2*ndivy,-cell_*ndivy,cell_*ndivy);
   gzH_   = fs->make<TH2F>(TString("gz_")   +id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-cell_*ndivx,cell_*ndivx,2*ndivy,-cell_*ndivy,cell_*ndivy);
+
+  float slope=2*h_/(tl_-bl_);
+  float offset=-h_*(tl_+bl_)/(tl_-bl_);
   for(int xbin=1; xbin<gxH_->GetXaxis()->GetNbins(); xbin++)
     {
       for(int ybin=1; ybin<gxH_->GetYaxis()->GetNbins(); ybin++)
@@ -39,13 +42,12 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
 	  float localX=gxH_->GetXaxis()->GetBinCenter(xbin);
 	  float localY=gxH_->GetYaxis()->GetBinCenter(ybin);
 
+	  //exclude points outside the range
+	  if(localY<fabs(localX)*slope+offset) continue;
+
 	  //local->global (mm to cm) 
 	  const HepGeom::Point3D<float> lcoord(localX/10,localY/10,0);
 	  const HepGeom::Point3D<float> gcoord( local2globalTr_*lcoord );
-
-	  if(xbin==gxH_->GetXaxis()->FindBin(0.) && ybin==gxH_->GetYaxis()->FindBin(0.))
-	    std::cout << localX << " " << localY << " -> " <<  gcoord.x() << " " << gcoord.y() << std::endl;
-
 	  gxH_->SetBinContent(xbin,ybin,gcoord.x()*10);
 	  gyH_->SetBinContent(xbin,ybin,gcoord.y()*10);
 	  gzH_->SetBinContent(xbin,ybin,gcoord.z()*10);
