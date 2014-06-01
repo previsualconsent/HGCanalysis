@@ -14,7 +14,9 @@
 #pragma link C++ function BuildHuffmanTree;
 #pragma link C++ function GenerateHuffmanCodes;
 #pragma link C++ function getHuffmanCodesFrom;
-
+#pragma link C++ function getTriggerBits;
+#pragma link C++ function getReadoutBits;
+#pragma link C++ function testCompressionAlgos;
 
 #endif
 

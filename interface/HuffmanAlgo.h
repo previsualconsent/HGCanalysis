@@ -2,9 +2,11 @@
 #define _huffman_algo_
 
 #include "TH1F.h"
+#include "TMath.h"
 
 #include <iostream>
 #include <queue>
+#include <string>
 #include <map>
 #include <iterator>
 #include <algorithm>
@@ -50,11 +52,17 @@ class HuffmanCode
 };
 typedef std::map<int, HuffmanCode> HuffmanCodeMap;
 
-
+//Huffman algorithm
 HuffmanTreeNode* BuildHuffmanTree(TH1 *h,bool checkNullEntries);
 void GenerateHuffmanCodes(const HuffmanTreeNode* node, const HuffmanCode prefix, HuffmanCodeMap& outCodes);
 HuffmanCodeMap getHuffmanCodesFrom(TH1F *h,bool checkNullEntries=true);
-void testHuffmanAlgo();
+
+//Marcello's algorithms
+int getTriggerBits(float nMips,float eta);
+int getReadoutBits(float nMips,float eta);
+
+//build a report
+std::map<std::string,float> testCompressionAlgos(TH1F *readoutH,TH1F *triggerH,float eta);
 
 
 

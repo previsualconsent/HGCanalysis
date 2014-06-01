@@ -10,26 +10,6 @@ import numpy as np
 from UserCode.HGCanalysis.PlotUtils import *
 
 from ROOT import *
-
-"""
-Marcello's algorithm
-"""
-def dataBitsToSend(eta,nMips):
-    nBits=0
-    if nMips==0 : return nBits
-    if eta<2.0:
-        if nMips<4:    nBits=1
-        elif nMips<10: nBits=4+2
-        else:          nBits=10
-    elif eta<2.5:
-        if nMips<10:   nBits=1
-        elif nMips<96: nBits=4+2
-        else:          nBits=10
-    else:
-        if nMips<25:    nBits=1
-        elif nMips<192: nBits=4+2
-        else:           nBits=10
-    return nBits
     
 """
 Return the weighted average and standard deviation.values, weights -- Numpy ndarrays with the same shape.
@@ -41,7 +21,7 @@ def weighted_avg_and_std(values, weights):
 
 """
 """
-def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix='') :
+def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix='',caption='') :
 
     #load utils
     gSystem.Load("libFWCoreFWLite.so");
@@ -70,28 +50,50 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
 
     #peak finder
     mipPeakFinderFunc=TF1('mipPeak','landau',0.4,1.6)
+
+    #base canvas
+    c=TCanvas('c','c',500,500)
     
-    cells=[1]
-    #cells=[1,2,3]
-    #thresholds=[0.4,1.0,5.0,10.,25.0]
-    thresholds=[0.4]
+    #cells=[1]
+    #thresholds=[0.4]
+    cells=[1,2,3]
+    thresholds=[0.4,1.0,5.0,10.,25.0]
     etaBins=[[1,3],[4,5],[6,7],[8,9],[10,11],[12,13],[14,15]]
 
-    
     #generate code to compress data
-    from ROOT import getHuffmanCodesFrom
-    espectrumH=TH1F('espectrumH',';(E/MIP) / coth(#eta);Hits',15,0.4,6.4)
-    espectrumH.Sumw2()
-    huffmanCodes={}
-    for cell in cells:
-        espectrumH.Reset('ICE')
-        occT.Draw('e_sr0/%f*TMath::TanH(eta) >> espectrumH'%mip,'cell==%d'%cell,'goff')
-        huffmanCodes[cell]=getHuffmanCodesFrom(espectrumH)
-        for bin in huffmanCodes[cell]:
-            print bin,huffmanCodes[cell][bin].val,huffmanCodes[cell][bin].nbits
+    from ROOT import testCompressionAlgos, getTriggerBits, getReadoutBits
+    roespectrumH=TH1F('roespectrumH',';(E/MIP) / coth(#eta);Hits (all layers)',255,0.4,102.4)
+    roespectrumH.Sumw2()
+    roespectrumH.SetLineWidth(2)
+    trigespectrumH=TH1F('trigespectrumH',';(E/MIP) / coth(#eta);Hits (all layers)',255,10,1285)
+    trigespectrumH.Sumw2()
+    trigespectrumH.SetLineWidth(2)
+    for etaMax in [2.0, 2.5, 3.0]:
+        for cell in cells:
+            roespectrumH.Reset('ICE')
+            occT.Draw('e_sr0/%f*TMath::TanH(eta) >> roespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f'%(cell,etaMax),'goff')
+            trigespectrumH.Reset('ICE')
+            occT.Draw('e_sr0/%f*TMath::TanH(eta) >> trigespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f'%(cell,etaMax),'goff')
+            res=testCompressionAlgos(roespectrumH,trigespectrumH,etaMax-0.1)
+
+            report='Difference wrt to baseline (%)'
+            for r in res: report = report +'\\%s %3.1f'%(r.first,100*(r.second-1))
+        
+            #save energy profile canvas
+            c.Clear()
+            roespectrumH.Draw('hist')
+            MyPaveText(caption)
+            ptxt=MyPaveText('#bf{|#eta|<%3.1f}, Cell area=%3.1f mm^{2}\\%s'%(etaMax,baseArea*cell,report),0.4,0.7,0.95,0.93)
+            ptxt.SetTextSize(0.035)
+            ptxt.SetFillColor(0)
+            ptxt.SetFillStyle(3001)
+            c.SetRightMargin(0.12)
+            c.SetLogy(True)
+            c.Update()
+            c.SaveAs('%s/espectrum_etalt%d_cell%d%s.png'%(output,etaMax*10,cell,pfix))
         
     #prepare plots
-    eprofH=TH2F('eprofH',';Pseudo-rapidity;(E/MIP) / coth(#eta);Hits',15,1.5,2.8,130,0,26)
+    eprofH=TH2F('eprofH',';Pseudo-rapidity;(E/MIP) / coth(#eta);Hits',15,1.5,2.9,130,0,26)
     eprofH.GetZaxis().SetTitleOffset(-0.3)
     eprofH.GetZaxis().SetLabelSize(0.035)
     eprofH.Sumw2()
@@ -127,12 +129,13 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 if not(iEtaBin in uncalibMIPprofiles[cell]):
                     dataVolProfiles[cell][iEtaBin]=occProfiles[thr][cell][iEtaBin].Clone()
                     uncalibMIPprofiles[cell][iEtaBin]=occProfiles[thr][cell][iEtaBin].Clone()
-                
-    #base canvas
-    c=TCanvas('c','c',500,500)
-
+       
     #iterate over layers
     for layer in layers:
+
+        sys.stdout.write( '\r Layer [%d/%d]'%(layer,len(layers)) )
+        sys.stdout.flush()
+
         for cell in cells:
 
             #create an entry list with these cuts
@@ -149,7 +152,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 occT.GetEntry( tentry )
                 corrEn=(occT.e_sr0/mip)*TMath.TanH(occT.eta)
                 if noiseLevel>0 : corrEn = corrEn + gRandom.Gaus(0,noiseLevel)
-                datavolH.Fill(TMath.Abs(occT.eta),dataBitsToSend(occT.eta,corrEn))
+                datavolH.Fill(TMath.Abs(occT.eta),getReadoutBits(corrEn,occT.eta))
                 eprofH.Fill(TMath.Abs(occT.eta),corrEn)
 
             #project in eta slices
@@ -200,18 +203,18 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 evCount=[]
                 for ybin in xrange(1,eH.GetXaxis().GetNbins()+1):
                     evCount.append( eH.GetBinContent(ybin) )
-                    dataSent.append( dataBitsToSend(ieta, eH.GetXaxis().GetBinLowEdge(ybin))[0] )
+                    dataSent.append( getReadoutBits(eH.GetXaxis().GetBinLowEdge(ybin))[0],ieta )
                 np=dataVolProfiles[cell][iEtaBin].GetN()
                 avgDataVol,stdDataVol=weighted_avg_and_std(dataSent,evCount)
                 dataVolProfiles[cell][iEtaBin].SetPoint(np,layer,avgDataVol)
-                dataVolProfiles[cell][iEtaBin].SetPointError(np,0,stdDataVol/TMath.Sqrt(totalHits))
+                dataVolProfiles[cell][iEtaBin].SetPointError(np,0,stdDataVol)
 
                 #all done here
                 eH.Delete()
                 
             #save energy profile canvas
             eprofH.Draw('colz')
-            MyPaveText('CMS simulation, <PU>=140 (14 TeV)')
+            MyPaveText(caption)
             ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer,baseArea*cell),0.12,0.9,0.9,0.93)
             ptxt.SetTextSize(0.035)
             ptxt.SetFillColor(0)
@@ -247,7 +250,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 leg.AddEntry(eDistsH[ih],eDistsH[ih].GetTitle(),'l')
 
             leg.Draw()
-            MyPaveText('CMS simulation, <PU>=140 (14 TeV)')
+            MyPaveText(caption)
             ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer,baseArea*cell),0.12,0.9,0.9,0.93)
             ptxt.SetTextSize(0.035)
             ptxt.SetFillColor(0)
@@ -305,7 +308,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 leg.AddEntry(occProfiles[thr][cell][eta],occProfiles[thr][cell][eta].GetTitle(),'cp')
 
             leg.Draw()
-            MyPaveText('CMS simulation, <PU>=140 (14 TeV)')
+            MyPaveText(caption)
             MyPaveText('Cell area=%3.1f mm^{2}, Threshold=%3.1f/MIP'%(baseArea*cell,thr),0.12,0.9,0.9,0.93).SetTextSize(0.035)
 
             c.Modified()
@@ -327,7 +330,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
             c.SetRightMargin(0.05)
             c.SetLogz(False)
             c.SetLogy(False)
-            drawOpt='acp'
+            drawOpt='ap'
             leg=TLegend(0.8,0.72,0.95,0.93)
             leg.SetHeader('#scale[0.75]{#bf{Pseudo-rapidity}}')
             leg.SetFillStyle(0)
@@ -339,11 +342,11 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 summaryGraphs[gr][0][cell][eta].GetXaxis().SetTitle("Layer")
                 summaryGraphs[gr][0][cell][eta].GetYaxis().SetTitle(summaryGraphs[gr][1])
                 summaryGraphs[gr][0][cell][eta].GetYaxis().SetRangeUser(summaryGraphs[gr][2][0],summaryGraphs[gr][2][1])
-                drawOpt='cp'
+                drawOpt='p'
                 leg.AddEntry(summaryGraphs[gr][0][cell][eta],summaryGraphs[gr][0][cell][eta].GetTitle(),'cp')
 
         leg.Draw()
-        MyPaveText('CMS simulation, <PU>=140 (14 TeV)')
+        MyPaveText(caption)
         MyPaveText('Cell area=%3.1f mm^{2}'%(baseArea*cell),0.12,0.9,0.9,0.93).SetTextSize(0.035)
 
         c.Modified()
@@ -360,9 +363,10 @@ def main():
 
     usage = 'usage: %prog [options]'
     parser = optparse.OptionParser(usage)
-    parser.add_option('-i', '--in'       ,    dest='input'          , help='Input file',  default=None)
-    parser.add_option('-o', '--out'      ,    dest='output'         , help='Output dir', default=None)
+    parser.add_option('-i', '--in'       ,    dest='input'          , help='Input file',       default=None)
+    parser.add_option('-o', '--out'      ,    dest='output'         , help='Output dir',       default=None)
     parser.add_option('-m', '--mip'      ,    dest='mip'            , help='MIP energy [keV]', default=55.1)
+    parser.add_option('-c', '--caption'  ,    dest='caption'        , help='Global caption',   default='CMS simulation, <PU>=140 (14 TeV)')
     (opt, args) = parser.parse_args()
 
     if opt.input is None or opt.output is None:
@@ -371,23 +375,25 @@ def main():
 
     #plot formatting
     customROOTstyle()
-    #gROOT.SetBatch(True)
-    gROOT.SetBatch(False)
+    gROOT.SetBatch(True)
+    #gROOT.SetBatch(False)
     gStyle.SetPalette(53)
 
     #standard
-    drawOccupancyAnalysisSummary(input=opt.input,output=opt.output,mip=opt.mip)
+    drawOccupancyAnalysisSummary(input=opt.input,output=opt.output,mip=opt.mip,caption=opt.caption)
 
     #using isolation cut (no other deposit >2*MIP in the neighbourhood)
     drawOccupancyAnalysisSummary(input=opt.input,output=opt.output,mip=opt.mip,
                                  addCut='(e_sr1+e_sr2)/16<%f'%opt.mip,
-                                 pfix='_iso')
-
+                                 pfix='_iso',
+                                 caption=opt.caption)
+    
     #adding noise
     drawOccupancyAnalysisSummary(input=opt.input,output=opt.output,mip=opt.mip,
                                  #http://en.wikipedia.org/wiki/Box-Muller_transform
                                  noiseLevel=0.2,
-                                 pfix='_noise')
+                                 pfix='_noise',
+                                 caption=opt.caption)
             
 if __name__ == "__main__":
     main()

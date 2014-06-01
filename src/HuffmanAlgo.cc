@@ -65,6 +65,7 @@ HuffmanCodeMap getHuffmanCodesFrom(TH1F *h, bool checkNullEntries)
   GenerateHuffmanCodes(rootNode, HuffmanCode(), codes);
   delete rootNode;
 
+  /*
   for(HuffmanCodeMap::iterator it = codes.begin();
       it!=codes.end();
       it++)
@@ -75,49 +76,100 @@ HuffmanCodeMap getHuffmanCodesFrom(TH1F *h, bool checkNullEntries)
 	cout << binVal[it->second.nbits-ibit-1];
       cout << " " << it->second.nbits << endl;
     }
-  
-
-
+  */
 
   return codes;
 }
 
 //
-void testHuffmanAlgo()
+int getTriggerBits(float nMips,float eta)
 {
-
-  //historam a string
-  //char SampleString[] = "this is an example for huffman encoding";
-  char SampleString[] = "aaaaaabbbbbbccccdddeeeffghhhhiiiiiijjjkkllmn";
-  std::map<char,int> strCts;
-  for(size_t i=0; i<sizeof(SampleString)-1; i++)
+  int nBits(2);
+  if( fabs(eta)<2.0 )
     {
-      if( strCts.find( SampleString[i] ) == strCts.end() ) strCts[ SampleString[i] ]=0;
-      strCts[ SampleString[i] ]++;
+      if(nMips<10)      nBits+=0;
+      else if(nMips<96) nBits+=4;
+      else              nBits+=8;
     }
-
-  TH1F *h=new TH1F("hstr",TString("String histo for:")+SampleString,strCts.size(),0,strCts.size());
-  int xbin(1);
-  for(std::map<char,int>::iterator it = strCts.begin(); it!= strCts.end(); it++, xbin++)
+  else if(fabs(eta)<2.5)
     {
-      h->GetXaxis()->SetBinLabel(xbin,TString(it->first));
-      h->SetBinContent(xbin,it->second);
-    }
-  h->Draw();
-
-  //get the codes
-  HuffmanCodeMap codes=getHuffmanCodesFrom(h);
-  for(HuffmanCodeMap::iterator it = codes.begin();
-      it!=codes.end();
-      it++)
+      if(nMips<10)      nBits+=0;
+      else if(nMips<96) nBits+=4;
+      else              nBits+=8;
+    }      
+  else if(fabs(eta)<2.5)
     {
-      std::bitset<8> binVal(it->second.val);
-      cout << it->first << " " << h->GetXaxis()->GetBinLabel(it->first) << " ";
-      for(unsigned int ibit=0; ibit<it->second.nbits; ibit++)
-	cout << binVal[it->second.nbits-ibit-1];
-      cout << endl;
-    }
-  
+      if(nMips<25)       nBits+=0;
+      else if(nMips<192) nBits+=4;
+      else               nBits+=8;
+    }      
+  return nBits;
 }
 
+//
+int getReadoutBits(float nMips,float eta)
+{
+  int nBits(2);
+  if( fabs(eta)<2.0 )
+    {
+      if(nMips<0.4)      nBits+=0;
+      else if(nMips<6.4) nBits+=6;
+      else               nBits+=10;
+    }
+  else if(fabs(eta)<2.5)
+    {
+      if(nMips<0.4)      nBits+=0;
+      else if(nMips<6.4) nBits+=6;
+      else               nBits+=10;
+    }      
+  else if(fabs(eta)<2.5)
+    {
+      if(nMips<0.4)      nBits+=0;
+      else if(nMips<6.4) nBits+=6;
+      else               nBits+=10;
+    }      
+  return nBits;
+}
+
+//
+std::map<string,float> testCompressionAlgos(TH1F *readoutH,TH1F *triggerH,float eta)
+{
+  std::map<std::string,float> results;
+
+  std::map<std::string,TH1F *> histos;
+  histos["readout"]=readoutH;
+  histos["trigger"]=triggerH;
+  for(std::map<std::string,TH1F *>:: iterator it=histos.begin(); it!= histos.end(); it++)
+    {
+      TH1F *h=it->second;
+      bool isTrigger( it->first=="trigger" );
+
+      //how many bits per word needed to fully describe this spectrum
+      int nbitsPerWord=TMath::Log(h->GetXaxis()->GetNbins())/TMath::Log(2)+1;
+      cout << nbitsPerWord << endl;
+
+      //get the Huffman codes
+      HuffmanCodeMap codes=getHuffmanCodesFrom(h);
+
+      //sum up
+      int totalBits(0), totalHuffmanBits(0), totalHGCBits(0);
+      for(HuffmanCodeMap::iterator it = codes.begin();
+	  it!=codes.end();
+	  it++)
+	{
+	  float thr=h->GetXaxis()->GetBinLowEdge(it->first);
+	  float cts=h->GetBinContent(it->first);
+	  totalBits        += cts*nbitsPerWord;
+	  totalHuffmanBits += cts*it->second.nbits;
+	  totalHGCBits     += cts*(isTrigger ? getTriggerBits(thr,eta) : getReadoutBits(thr,eta));
+	}
+
+
+      results["Huffman " + it->first] = ((float)totalHuffmanBits/(float)totalBits);
+      results["HGC " + it->first]     = ((float)totalHGCBits/(float)totalBits);
+    }
+
+  //all done here
+  return results;
+}
 
