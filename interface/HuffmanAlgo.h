@@ -51,8 +51,9 @@ class HuffmanCode
 typedef std::map<int, HuffmanCode> HuffmanCodeMap;
 
 
-HuffmanTreeNode* BuildHuffmanTree(TH1 *h);
+HuffmanTreeNode* BuildHuffmanTree(TH1 *h,bool checkNullEntries);
 void GenerateHuffmanCodes(const HuffmanTreeNode* node, const HuffmanCode prefix, HuffmanCodeMap& outCodes);
+HuffmanCodeMap getHuffmanCodesFrom(TH1F *h,bool checkNullEntries=true);
 void testHuffmanAlgo();
 
 

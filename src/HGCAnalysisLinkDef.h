@@ -13,6 +13,7 @@
 #pragma link C++ typedef HuffmanCodeMap;
 #pragma link C++ function BuildHuffmanTree;
 #pragma link C++ function GenerateHuffmanCodes;
+#pragma link C++ function getHuffmanCodesFrom;
 
 
 #endif

@@ -5,7 +5,7 @@
 using namespace std;
 
 //builds the Huffman tree and returns it's root node
-HuffmanTreeNode* BuildHuffmanTree(TH1 *h)
+HuffmanTreeNode* BuildHuffmanTree(TH1 *h,bool checkNullEntries)
 {
   if(h==0) return 0;
   
@@ -16,6 +16,7 @@ HuffmanTreeNode* BuildHuffmanTree(TH1 *h)
   for(int i = 1; i <= h->GetXaxis()->GetNbins(); i++)
     {
       int cts=h->GetBinContent(i);
+      if(checkNullEntries && cts==0) cts=1; 
       if(cts) trees.push( new HuffmanTreeNode(i,cts) );
     }
   
@@ -56,6 +57,32 @@ void GenerateHuffmanCodes(const HuffmanTreeNode* node, const HuffmanCode prefix,
 
 
 //
+HuffmanCodeMap getHuffmanCodesFrom(TH1F *h, bool checkNullEntries)
+{
+  //encode
+  HuffmanTreeNode *rootNode = BuildHuffmanTree(h,checkNullEntries);
+  HuffmanCodeMap codes;
+  GenerateHuffmanCodes(rootNode, HuffmanCode(), codes);
+  delete rootNode;
+
+  for(HuffmanCodeMap::iterator it = codes.begin();
+      it!=codes.end();
+      it++)
+    {
+      std::bitset<8> binVal(it->second.val);
+      cout << it->first << " ";
+      for(unsigned int ibit=0; ibit<it->second.nbits; ibit++)
+	cout << binVal[it->second.nbits-ibit-1];
+      cout << " " << it->second.nbits << endl;
+    }
+  
+
+
+
+  return codes;
+}
+
+//
 void testHuffmanAlgo()
 {
 
@@ -78,12 +105,8 @@ void testHuffmanAlgo()
     }
   h->Draw();
 
-  //encode
-  HuffmanTreeNode *rootNode = BuildHuffmanTree(h);
-  HuffmanCodeMap codes;
-  GenerateHuffmanCodes(rootNode, HuffmanCode(), codes);
-  delete rootNode;
-
+  //get the codes
+  HuffmanCodeMap codes=getHuffmanCodesFrom(h);
   for(HuffmanCodeMap::iterator it = codes.begin();
       it!=codes.end();
       it++)
