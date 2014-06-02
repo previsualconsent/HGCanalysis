@@ -97,7 +97,7 @@ int getTriggerBits(float nMips,float eta)
       else if(nMips<96) nBits+=4;
       else              nBits+=8;
     }      
-  else if(fabs(eta)<2.5)
+  else 
     {
       if(nMips<25)       nBits+=0;
       else if(nMips<192) nBits+=4;
@@ -122,7 +122,7 @@ int getReadoutBits(float nMips,float eta)
       else if(nMips<6.4) nBits+=6;
       else               nBits+=10;
     }      
-  else if(fabs(eta)<2.5)
+  else 
     {
       if(nMips<0.4)      nBits+=0;
       else if(nMips<6.4) nBits+=6;

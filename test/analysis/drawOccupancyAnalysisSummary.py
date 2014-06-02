@@ -58,7 +58,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
     #thresholds=[0.4]
     cells=[1,2,3]
     thresholds=[0.4,1.0,5.0,10.,25.0]
-    etaBins=[[1,3],[4,5],[6,7],[8,9],[10,11],[12,13],[14,15]]
+    etaBins=[[1,3],[4,5],[6,7],[8,9],[10,11],[12,12],[13,13]]
 
     #generate code to compress data
     from ROOT import testCompressionAlgos, getTriggerBits, getReadoutBits
@@ -68,13 +68,13 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
     trigespectrumH=TH1F('trigespectrumH',';(E/MIP) / coth(#eta);Hits (all layers)',255,10,1285)
     trigespectrumH.Sumw2()
     trigespectrumH.SetLineWidth(2)
-    for etaMax in [2.0, 2.5, 3.0]:
+    for etaRange in [[1.5,2.0],[2.0,2.5],[2.5,3.0]]:
         for cell in cells:
             roespectrumH.Reset('ICE')
-            occT.Draw('e_sr0/%f*TMath::TanH(eta) >> roespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f'%(cell,etaMax),'goff')
+            occT.Draw('e_sr0/%f*TMath::TanH(eta) >> roespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f && TMath::Abs(eta)>=%f'%(cell,etaRange[1],etaRange[0]),'goff')
             trigespectrumH.Reset('ICE')
-            occT.Draw('e_sr0/%f*TMath::TanH(eta) >> trigespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f'%(cell,etaMax),'goff')
-            res=testCompressionAlgos(roespectrumH,trigespectrumH,etaMax-0.1)
+            occT.Draw('e_sr0/%f*TMath::TanH(eta) >> trigespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f && TMath::Abs(eta)>=%f'%(cell,etaRange[1],etaRange[0]),'goff')
+            res=testCompressionAlgos(roespectrumH,trigespectrumH,0.5*(etaRange[1]+etaRange[0]))
 
             report='Difference wrt to baseline (%)'
             for r in res: report = report +'\\%s %3.1f'%(r.first,100*(r.second-1))
@@ -83,14 +83,14 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
             c.Clear()
             roespectrumH.Draw('hist')
             MyPaveText(caption)
-            ptxt=MyPaveText('#bf{|#eta|<%3.1f}, Cell area=%3.1f mm^{2}\\%s'%(etaMax,baseArea*cell,report),0.4,0.7,0.95,0.93)
+            ptxt=MyPaveText('#bf{%3.1f<|#eta|<%3.1f}\\Cell area=%3.1f mm^{2}\\%s'%(etaRange[0],etaRange[1],baseArea*cell,report),0.4,0.65,0.95,0.93)
             ptxt.SetTextSize(0.035)
             ptxt.SetFillColor(0)
             ptxt.SetFillStyle(3001)
             c.SetRightMargin(0.12)
             c.SetLogy(True)
             c.Update()
-            c.SaveAs('%s/espectrum_etalt%d_cell%d%s.png'%(output,etaMax*10,cell,pfix))
+            c.SaveAs('%s/espectrum_eta%dto%d_cell%d%s.png'%(output,etaRange[0]*10,etaRange[1]*10,cell,pfix))
         
     #prepare plots
     eprofH=TH2F('eprofH',';Pseudo-rapidity;(E/MIP) / coth(#eta);Hits',15,1.5,2.9,130,0,26)
@@ -203,7 +203,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 evCount=[]
                 for ybin in xrange(1,eH.GetXaxis().GetNbins()+1):
                     evCount.append( eH.GetBinContent(ybin) )
-                    dataSent.append( getReadoutBits(eH.GetXaxis().GetBinLowEdge(ybin))[0],ieta )
+                    dataSent.append( getReadoutBits(eH.GetXaxis().GetBinLowEdge(ybin),ieta) )
                 np=dataVolProfiles[cell][iEtaBin].GetN()
                 avgDataVol,stdDataVol=weighted_avg_and_std(dataSent,evCount)
                 dataVolProfiles[cell][iEtaBin].SetPoint(np,layer,avgDataVol)
