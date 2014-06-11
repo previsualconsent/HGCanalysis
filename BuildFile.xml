@@ -1,4 +1,5 @@
 <use name="DetectorDescription/Base"/>
+<use name="SimDataFormats/GeneratorProducts"/>
 <use name="CommonTools/UtilAlgos"/>
 <use name="root"/>
 <use name="clhep"/>

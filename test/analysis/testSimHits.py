@@ -88,7 +88,7 @@ def integrateSimHits(fInUrl,fout,accMap,treeName='hgcSimHitsAnalyzer/HGC'):
     sys.stdout.write( '\r Status [%d/%d]'%(iev,HGC.GetEntries()))
       
     #require 1 single particle
-    if HGC.ngen!=1 : continue
+    if HGC.ngen==0 or HGC.ngen>2 : continue
     genPt=HGC.gen_pt[0]
     genEta=HGC.gen_eta[0]
     genPhi=HGC.gen_phi[0]
@@ -105,6 +105,9 @@ def integrateSimHits(fInUrl,fout,accMap,treeName='hgcSimHitsAnalyzer/HGC'):
       sec=HGC.hit_sec[n]
       bin=HGC.hit_bin[n]
       rho,eta,phi=accMap[sdType][layer].getGlobalCoordinates(sec,bin)
+      
+      if eta*genEta<0 : continue
+
       edep=HGC.hit_edep[n]
 
       deltaPhi=TVector2.Phi_mpi_pi(phi-genPhi)
