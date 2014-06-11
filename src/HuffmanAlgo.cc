@@ -65,18 +65,15 @@ HuffmanCodeMap getHuffmanCodesFrom(TH1F *h, bool checkNullEntries)
   GenerateHuffmanCodes(rootNode, HuffmanCode(), codes);
   delete rootNode;
 
-  /*
   for(HuffmanCodeMap::iterator it = codes.begin();
       it!=codes.end();
       it++)
     {
       std::bitset<8> binVal(it->second.val);
-      cout << it->first << " ";
-      for(unsigned int ibit=0; ibit<it->second.nbits; ibit++)
-	cout << binVal[it->second.nbits-ibit-1];
+      cout << it->first << " " << h->GetXaxis()->GetBinLowEdge(it->first) << " " << h->GetBinContent(it->first) << " ";
+      for(unsigned int ibit=0; ibit<it->second.nbits; ibit++) cout << binVal[it->second.nbits-ibit-1];
       cout << " " << it->second.nbits << endl;
     }
-  */
 
   return codes;
 }
@@ -87,19 +84,19 @@ int getTriggerBits(float nMips,float eta)
   int nBits(2);
   if( fabs(eta)<2.0 )
     {
-      if(nMips<10)      nBits+=0;
+      if(nMips<10)      nBits=1;
       else if(nMips<96) nBits+=4;
       else              nBits+=8;
     }
   else if(fabs(eta)<2.5)
     {
-      if(nMips<10)      nBits+=0;
+      if(nMips<10)      nBits=1;
       else if(nMips<96) nBits+=4;
       else              nBits+=8;
     }      
   else 
     {
-      if(nMips<25)       nBits+=0;
+      if(nMips<25)       nBits=1;
       else if(nMips<192) nBits+=4;
       else               nBits+=8;
     }      
@@ -112,19 +109,19 @@ int getReadoutBits(float nMips,float eta)
   int nBits(2);
   if( fabs(eta)<2.0 )
     {
-      if(nMips<0.4)      nBits+=0;
+      if(nMips<0.4)      nBits=1;
       else if(nMips<6.4) nBits+=6;
       else               nBits+=10;
     }
   else if(fabs(eta)<2.5)
     {
-      if(nMips<0.4)      nBits+=0;
+      if(nMips<0.4)      nBits=1;
       else if(nMips<6.4) nBits+=6;
       else               nBits+=10;
     }      
   else 
     {
-      if(nMips<0.4)      nBits+=0;
+      if(nMips<0.4)      nBits=1;
       else if(nMips<6.4) nBits+=6;
       else               nBits+=10;
     }      

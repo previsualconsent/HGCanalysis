@@ -18,7 +18,7 @@ class HitIntegrator:
   def __init__(self):
     self.varNames=[]
     self.subDets=['ec1','ec2','ec3','hc1','hc2']
-    self.vars=['avgdeta','avgdphi','en','endr01','endr025','endr05']
+    self.vars=['avgdeta','avgdphi','en','endr1','endr25','endr5']
     self.hitsCollection={}
     for subDet in self.subDets:
       self.hitsCollection[subDet]={}
@@ -56,9 +56,9 @@ class HitIntegrator:
     iVarVal={'avgdeta'    : deltaEta*edep,
              'avgdphi'    : deltaPhi*edep,
              'en'       : edep,
-             'endr01'  : 0. if deltaR>0.01  else edep,
-             'endr025' : 0. if deltaR>0.025 else edep,
-             'endr05'  : 0. if deltaR>0.05  else edep }
+             'endr1'  : 0. if deltaR>0.1  else edep,
+             'endr25' : 0. if deltaR>0.25 else edep,
+             'endr5'  : 0. if deltaR>0.5  else edep }
     for var in iVarVal:
       curVal=self.hitsCollection[subDetName][var]+iVarVal[var]
       self.hitsCollection[subDetName][var]=curVal

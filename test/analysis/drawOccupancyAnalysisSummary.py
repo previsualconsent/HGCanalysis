@@ -36,8 +36,12 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
     occT=fIn.Get('occ')
   
     #get base cell area (mm^2)
-    occT.GetEntry(0)
-    baseArea=occT.area
+    baseArea=1
+    for ientry in xrange(0,occT.GetEntriesFast()-1):
+        occT.GetEntry(ientry)
+        if occT.cell!=1 : continue 
+        baseArea=occT.area
+        break
 
     #get how many layers the sensitive detector has
     layersH=TH1F('layersH',';Layer #;',100,0,100)
@@ -58,40 +62,40 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
     #thresholds=[0.4]
     cells=[1,2,3]
     thresholds=[0.4,1.0,5.0,10.,25.0]
-    etaBins=[[1,3],[4,5],[6,7],[8,9],[10,11],[12,12],[13,13]]
+    etaBins=[[1,3],[4,5],[6,7],[8,9],[10,11],[12,13]]#,[14,14],[15,15]]
 
     #generate code to compress data
-    from ROOT import testCompressionAlgos, getTriggerBits, getReadoutBits
-    roespectrumH=TH1F('roespectrumH',';(E/MIP) / coth(#eta);Hits (all layers)',255,0.4,102.4)
-    roespectrumH.Sumw2()
-    roespectrumH.SetLineWidth(2)
-    trigespectrumH=TH1F('trigespectrumH',';(E/MIP) / coth(#eta);Hits (all layers)',255,10,1285)
-    trigespectrumH.Sumw2()
-    trigespectrumH.SetLineWidth(2)
-    for etaRange in [[1.5,2.0],[2.0,2.5],[2.5,3.0]]:
-        for cell in cells:
-            roespectrumH.Reset('ICE')
-            occT.Draw('e_sr0/%f*TMath::TanH(eta) >> roespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f && TMath::Abs(eta)>=%f'%(cell,etaRange[1],etaRange[0]),'goff')
-            trigespectrumH.Reset('ICE')
-            occT.Draw('e_sr0/%f*TMath::TanH(eta) >> trigespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f && TMath::Abs(eta)>=%f'%(cell,etaRange[1],etaRange[0]),'goff')
-            res=testCompressionAlgos(roespectrumH,trigespectrumH,0.5*(etaRange[1]+etaRange[0]))
+    #from ROOT import testCompressionAlgos, getTriggerBits, getReadoutBits
+    #roespectrumH=TH1F('roespectrumH',';(E/MIP) / coth(#eta);Hits (all layers)',255,0.4,102.4)
+    #roespectrumH.Sumw2()
+    #roespectrumH.SetLineWidth(2)
+    #trigespectrumH=TH1F('trigespectrumH',';(E/MIP) / coth(#eta);Hits (all layers)',255,10,1285)
+    #trigespectrumH.Sumw2()
+    #trigespectrumH.SetLineWidth(2)
+    #for etaRange in [[1.5,2.0],[2.0,2.5],[2.5,3.0]]:
+    #    for cell in cells:
+    #        roespectrumH.Reset('ICE')
+    #        occT.Draw('(e_sr0/%f)*TMath::TanH(eta) >> roespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f && TMath::Abs(eta)>=%f'%(cell,etaRange[1],etaRange[0]),'goff')
+    #        trigespectrumH.Reset('ICE')
+    #        occT.Draw('(e_sr0/%f)*TMath::TanH(eta) >> trigespectrumH'%mip,'cell==%d && TMath::Abs(eta)<%f && TMath::Abs(eta)>=%f'%(cell,etaRange[1],etaRange[0]),'goff')
+    #        res=testCompressionAlgos(roespectrumH,trigespectrumH,0.5*(etaRange[1]+etaRange[0]))
 
-            report='Difference wrt to baseline (%)'
-            for r in res: report = report +'\\%s %3.1f'%(r.first,100*(r.second-1))
+    #        report='Difference wrt to baseline (%)'
+    #        for r in res: report = report +'\\%s %3.1f'%(r.first,100*(r.second-1))
         
             #save energy profile canvas
-            c.Clear()
-            roespectrumH.Draw('hist')
-            MyPaveText(caption)
-            ptxt=MyPaveText('#bf{%3.1f<|#eta|<%3.1f}\\Cell area=%3.1f mm^{2}\\%s'%(etaRange[0],etaRange[1],baseArea*cell,report),0.4,0.65,0.95,0.93)
-            ptxt.SetTextSize(0.035)
-            ptxt.SetFillColor(0)
-            ptxt.SetFillStyle(3001)
-            c.SetRightMargin(0.12)
-            c.SetLogy(True)
-            c.Update()
-            c.SaveAs('%s/espectrum_eta%dto%d_cell%d%s.png'%(output,etaRange[0]*10,etaRange[1]*10,cell,pfix))
-        
+    #        c.Clear()
+    #        roespectrumH.Draw('hist')
+    #        MyPaveText(caption)
+    #        ptxt=MyPaveText('#bf{%3.1f<|#eta|<%3.1f}\\Cell area=%3.1f mm^{2}\\%s'%(etaRange[0],etaRange[1],baseArea*cell,report),0.4,0.65,0.95,0.93)
+    #        ptxt.SetTextSize(0.035)
+    #        ptxt.SetFillColor(0)
+    #        ptxt.SetFillStyle(3001)
+    #        c.SetRightMargin(0.12)
+    #        c.SetLogy(True)
+    #        c.Update()
+    #        c.SaveAs('%s/espectrum_eta%dto%d_cell%d%s.png'%(output,etaRange[0]*10,etaRange[1]*10,cell,pfix))
+
     #prepare plots
     eprofH=TH2F('eprofH',';Pseudo-rapidity;(E/MIP) / coth(#eta);Hits',15,1.5,2.9,130,0,26)
     eprofH.GetZaxis().SetTitleOffset(-0.3)
@@ -103,10 +107,15 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
     eprofGr.SetLineColor(38)
     eprofGr.SetLineWidth(2)
     occProfiles={}
-    dataVolH=TH2F('datavolH',';Pseudo-rapidity;#bits sent/bunch crossing;Hits',15,1.5,2.8,16,0,16)
+    dataVolH=TH2F('datavolH',';Pseudo-rapidity;#bits sent/bunch crossing;Hits',15,1.5,2.9,32,0,32)
     dataVolH.GetZaxis().SetTitleOffset(-0.3)
     dataVolH.GetZaxis().SetLabelSize(0.035)
     dataVolH.Sumw2()
+    dataprofGr=TGraphErrors()
+    dataprofGr.SetMarkerStyle(20)
+    dataprofGr.SetMarkerColor(38)
+    dataprofGr.SetLineColor(38)
+    dataprofGr.SetLineWidth(2)
     dataVolProfiles={}
     uncalibMIPprofiles={}
     for thr in thresholds:
@@ -145,19 +154,21 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
             elist = ROOT.gDirectory.Get("elist")
 
             #fill the base histograms 
-            datavolH.Reset('ICE')
+            dataVolH.Reset('ICE')
             eprofH.Reset('ICE')
             for ientry in xrange(0,elist.GetN()):
                 tentry=elist.GetEntry(ientry) 
                 occT.GetEntry( tentry )
                 corrEn=(occT.e_sr0/mip)*TMath.TanH(occT.eta)
                 if noiseLevel>0 : corrEn = corrEn + gRandom.Gaus(0,noiseLevel)
-                datavolH.Fill(TMath.Abs(occT.eta),getReadoutBits(corrEn,occT.eta))
+                dataVolH.Fill(TMath.Abs(occT.eta),getReadoutBits(corrEn,occT.eta))
                 eprofH.Fill(TMath.Abs(occT.eta),corrEn)
 
             #project in eta slices
             eprofGr.Set(0)
+            dataprofGr.Set(0)
             eDistsH=[]
+            dataDistsH=[]
             for iEtaBin in xrange(0,len(etaBins)):
 
                 #coordinates
@@ -176,11 +187,11 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 if totalHits==0 : continue
                                                
                 #get average deposit
-                meanEn,meanEnErr=eH.GetMean(),eH.GetMeanError()
+                meanEn,meanEnErr=eH.GetMean(),eH.GetRMS()
                 np=eprofGr.GetN()
                 eprofGr.SetPoint(np,ieta,meanEn)
                 eprofGr.SetPointError(np,0.5*deta,meanEnErr)
-                
+                    
                 #fit near the MIP peak
                 mipPeakFinderFunc.SetParameter(1,1)
                 eH.Fit(mipPeakFinderFunc,'QLR0+','',0.4,1.6)
@@ -199,89 +210,102 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                     occProfiles[thr][cell][iEtaBin].SetPointError(np,0,cellOccErr*100/totalHits)
                     
                 #data volume
-                dataSent=[]
-                evCount=[]
-                for ybin in xrange(1,eH.GetXaxis().GetNbins()+1):
-                    evCount.append( eH.GetBinContent(ybin) )
-                    dataSent.append( getReadoutBits(eH.GetXaxis().GetBinLowEdge(ybin),ieta) )
+                dvH=dataVolH.ProjectionY('dvH',etaBins[iEtaBin][0],etaBins[iEtaBin][1])
+                dvH.SetTitle('%3.1f-%3.1f'%(etaMin,etaMax))
+                fixExtremities(dvH)
+                dataDistsH.append( dvH.Clone('dvprof_%d'%iEtaBin) )
+                meanData,meanDataErr=dvH.GetMean(),dvH.GetRMS()
+                np=dataprofGr.GetN()
+                dataprofGr.SetPoint(np,ieta,meanData)
+                dataprofGr.SetPointError(np,0.5*deta,meanDataErr)
                 np=dataVolProfiles[cell][iEtaBin].GetN()
-                avgDataVol,stdDataVol=weighted_avg_and_std(dataSent,evCount)
-                dataVolProfiles[cell][iEtaBin].SetPoint(np,layer,avgDataVol)
-                dataVolProfiles[cell][iEtaBin].SetPointError(np,0,stdDataVol)
+                dataVolProfiles[cell][iEtaBin].SetPoint(np,layer,meanData)
+                dataVolProfiles[cell][iEtaBin].SetPointError(np,0,dvH.GetMeanError())
 
                 #all done here
                 eH.Delete()
+                dvH.Delete()
                 
-            #save energy profile canvas
-            eprofH.Draw('colz')
-            MyPaveText(caption)
-            ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer,baseArea*cell),0.12,0.9,0.9,0.93)
-            ptxt.SetTextSize(0.035)
-            ptxt.SetFillColor(0)
-            ptxt.SetFillStyle(3001)
-            eprofGr.Draw('p')
-            c.SetRightMargin(0.12)
-            c.SetLogz(True)
-            c.SetLogy(False)
-            c.Modified()
-            c.Update()
-            c.SaveAs('%s/eprof2D_layer%d_cell%d%s.png'%(output,layer,cell,pfix))
+            #save profile canvas
+            profilesToSave={'eprof2D':[eprofH,eprofGr],
+                            'dvprof2D':[dataVolH,dataprofGr]}
+            for prof in profilesToSave:
+                c.Clear()
+                profilesToSave[prof][0].Draw('colz')
+                profilesToSave[prof][1].Draw('p')
+                MyPaveText(caption)
+                ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer,baseArea*cell),0.12,0.9,0.9,0.93)
+                ptxt.SetTextSize(0.035)
+                ptxt.SetFillColor(0)
+                ptxt.SetFillStyle(3001)
+                c.SetRightMargin(0.12)
+                c.SetLogz(True)
+                c.SetLogy(False)
+                c.Modified()
+                c.Update()
+                c.SaveAs('%s/%s_layer%d_cell%d%s.png'%(output,prof,layer,cell,pfix))
+                c.SaveAs('%s/%s_layer%d_cell%d%s.C'%(output,prof,layer,cell,pfix))
 
-            #energy distributions at a given #eta
-            c.Clear()
-            c.SetLogz(False)
-            c.SetRightMargin(0.05)
+            #distributions at a given #eta
+            slicesToSave={'eprof1D':[eDistsH,[0.4,3]],
+                          'dv1D':   [dataDistsH,[0,16]]}
+            for dist in slicesToSave:
+                c.Clear()
+                c.SetLogz(False)
+                c.SetRightMargin(0.05)
             
-            drawOpt='hist'
-            leg=TLegend(0.15,0.7,0.45,0.88)
-            leg.SetFillStyle(0)
-            leg.SetBorderSize(0)
-            leg.SetTextFont(42)
-            leg.SetTextSize(0.035)
-            leg.SetHeader('#scale[0.75]{#bf{Pseudo-rapidity}}')
-            for ih in xrange(len(eDistsH)-1,0,-2):
-                eDistsH[ih].Draw(drawOpt)
-                drawOpt='hist same'
-                eDistsH[ih].GetYaxis().SetTitle('Hits')
-                ctr=(len(eDistsH)-ih)/2
-                eDistsH[ih].SetLineColor(1+ctr/2)
-                eDistsH[ih].SetLineStyle(1+ctr%2)
-                eDistsH[ih].SetLineWidth(2)
-                leg.AddEntry(eDistsH[ih],eDistsH[ih].GetTitle(),'l')
-
-            leg.Draw()
-            MyPaveText(caption)
-            ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer,baseArea*cell),0.12,0.9,0.9,0.93)
-            ptxt.SetTextSize(0.035)
-            ptxt.SetFillColor(0)
-            ptxt.SetFillStyle(3001)
-            
-            #zoom in
-            c.cd()
-            subc=TPad('zoom','zoom',0.47,0.45,0.92,0.9)
-            subc.Draw()
-            subc.cd();
-            subc.SetFillStyle(0)
-            subc.SetBottomMargin(0.25)
-            subc.SetLeftMargin(0.25)
-            drawOpt='hist'
-            zoomDistsH=[]
-            for ih in xrange(len(eDistsH)-1,0,-2):
-                nzoom=len(zoomDistsH)
-                zoomDistsH.append( eDistsH[ih].Clone('%s_zoom'%eDistsH[ih].GetName()) )
-                zoomDistsH[ nzoom ].Draw(drawOpt)
-                zoomDistsH[ nzoom ].GetXaxis().SetRangeUser(0.4,3)
-                zoomDistsH[ nzoom ].GetYaxis().SetTitle('Events (normalized in range)')
-                zoomDistsH[ nzoom ].GetYaxis().SetTitleOffset(1.5)
-                totInZoom=zoomDistsH[nzoom].Integral( zoomDistsH[nzoom].GetXaxis().FindBin(0.4),zoomDistsH[nzoom].GetXaxis().FindBin(3) )
-                if totInZoom>0 : zoomDistsH[ nzoom ].Scale(1./totInZoom)
-                drawOpt='hist same'
-
-            c.cd()
-            c.SetLogy()
-            c.Modified()
-            c.Update()
-            c.SaveAs('%s/eprof1D_layer%d_cell%d%s.png'%(output,layer,cell,pfix))
+                drawOpt='hist'
+                leg=TLegend(0.15,0.7,0.45,0.88)
+                leg.SetFillStyle(0)
+                leg.SetBorderSize(0)
+                leg.SetTextFont(42)
+                leg.SetTextSize(0.035)
+                leg.SetHeader('#scale[0.75]{#bf{Pseudo-rapidity}}')
+                for ih in xrange(len(slicesToSave[dist][0])-1,0,-2):
+                    slicesToSave[dist][0][ih].Draw(drawOpt)
+                    drawOpt='hist same'
+                    slicesToSave[dist][0][ih].GetYaxis().SetTitle('Hits')
+                    ctr=(len(slicesToSave[dist][0])-ih)/2
+                    slicesToSave[dist][0][ih].SetLineColor(1+ctr/2)
+                    slicesToSave[dist][0][ih].SetLineStyle(1+ctr%2)
+                    slicesToSave[dist][0][ih].SetLineWidth(2)
+                    leg.AddEntry(slicesToSave[dist][0][ih],slicesToSave[dist][0][ih].GetTitle(),'l')
+                leg.Draw()
+                MyPaveText(caption)
+                ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer,baseArea*cell),0.12,0.9,0.9,0.93)
+                ptxt.SetTextSize(0.035)
+                ptxt.SetFillColor(0)
+                ptxt.SetFillStyle(3001)
+                
+                #zoom in
+                c.cd()
+                subc=TPad('zoom','zoom',0.47,0.45,0.92,0.9)
+                subc.Draw()
+                subc.cd();
+                subc.SetFillStyle(0)
+                subc.SetBottomMargin(0.25)
+                subc.SetLeftMargin(0.25)
+                drawOpt='hist'
+                zoomDistsH=[]
+                for ih in xrange(len(slicesToSave[dist][0])-1,0,-2):
+                    nzoom=len(zoomDistsH)
+                    zoomDistsH.append( slicesToSave[dist][0][ih].Clone('%s_zoom'%slicesToSave[dist][0][ih].GetName()) )
+                    zoomDistsH[ nzoom ].Draw(drawOpt)
+                    zoomMin=slicesToSave[dist][1][0]
+                    zoomMax=slicesToSave[dist][1][1]
+                    zoomDistsH[ nzoom ].GetXaxis().SetRangeUser(zoomMin,zoomMax)
+                    zoomDistsH[ nzoom ].GetYaxis().SetTitle('Events (normalized in range)')
+                    zoomDistsH[ nzoom ].GetYaxis().SetTitleOffset(1.5)
+                    totInZoom=zoomDistsH[nzoom].Integral( zoomDistsH[nzoom].GetXaxis().FindBin(zoomMin),zoomDistsH[nzoom].GetXaxis().FindBin(zoomMax) )
+                    if totInZoom>0 : zoomDistsH[ nzoom ].Scale(1./totInZoom)
+                    drawOpt='hist same'
+                    
+                c.cd()
+                c.SetLogy()
+                c.Modified()
+                c.Update()
+                c.SaveAs('%s/%s_layer%d_cell%d%s.png'%(output,dist,layer,cell,pfix))
+                c.SaveAs('%s/%s_layer%d_cell%d%s.C'%(output,dist,layer,cell,pfix))
 
     #occupancy summaries
     for thr in occProfiles:
@@ -292,7 +316,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
             c.SetLogz(False)
             c.SetLogy(False)
             drawOpt='acp'
-            leg=TLegend(0.8,0.72,0.95,0.93)
+            leg=TLegend(0.75,0.72,0.95,0.93)
             leg.SetFillStyle(0)
             leg.SetBorderSize(0)
             leg.SetTextFont(42)
@@ -314,15 +338,17 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
             c.Modified()
             c.Update()
             c.SaveAs('%s/occ_thr%d_cell%d%s.png'%(output,10*thr,cell,pfix))
+            c.SaveAs('%s/occ_thr%d_cell%d%s.C'%(output,10*thr,cell,pfix))
             c.SetLogy(True)
             for eta in occProfiles[thr][cell]: occProfiles[thr][cell][eta].GetYaxis().SetRangeUser(1e-2,100)
             c.Modified()
             c.Update()
             c.SaveAs('%s/occ_thr%d_cell%d%s_log.png'%(output,10*thr,cell,pfix))
+            c.SaveAs('%s/occ_thr%d_cell%d%s_log.C'%(output,10*thr,cell,pfix))
 
     #other summary graphs
-    summaryGraphs={'datavol':[dataVolProfiles,    "Average data sent / cell (bit)", [0,3]],
-                   'mippeak':[uncalibMIPprofiles, "E / MIP (peak)",                 [0.8,1.4]] 
+    summaryGraphs={'datavol':[dataVolProfiles,    "Average data sent / cell (bit)", [0,10]],
+                   'mippeak':[uncalibMIPprofiles, "E / MIP (peak)",                 [0.5,2.0]] 
                    }
     for gr in summaryGraphs:
         for cell in summaryGraphs[gr][0]:
@@ -345,14 +371,14 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 drawOpt='p'
                 leg.AddEntry(summaryGraphs[gr][0][cell][eta],summaryGraphs[gr][0][cell][eta].GetTitle(),'cp')
 
-        leg.Draw()
-        MyPaveText(caption)
-        MyPaveText('Cell area=%3.1f mm^{2}'%(baseArea*cell),0.12,0.9,0.9,0.93).SetTextSize(0.035)
+            leg.Draw()
+            MyPaveText(caption)
+            MyPaveText('Cell area=%3.1f mm^{2}'%(baseArea*cell),0.12,0.9,0.9,0.93).SetTextSize(0.035)
 
-        c.Modified()
-        c.Update()
-        c.SaveAs('%s/%s_cell%d%s.png'%(output,gr,cell,pfix))
-
+            c.Modified()
+            c.Update()
+            c.SaveAs('%s/%s_cell%d%s.png'%(output,gr,cell,pfix))
+            c.SaveAs('%s/%s_cell%d%s.C'%(output,gr,cell,pfix))
             
     fIn.Close()
 
@@ -365,7 +391,7 @@ def main():
     parser = optparse.OptionParser(usage)
     parser.add_option('-i', '--in'       ,    dest='input'          , help='Input file',       default=None)
     parser.add_option('-o', '--out'      ,    dest='output'         , help='Output dir',       default=None)
-    parser.add_option('-m', '--mip'      ,    dest='mip'            , help='MIP energy [keV]', default=55.1)
+    parser.add_option('-m', '--mip'      ,    dest='mip'            , help='MIP energy [keV]', default=55.1, type=float)
     parser.add_option('-c', '--caption'  ,    dest='caption'        , help='Global caption',   default='CMS simulation, <PU>=140 (14 TeV)')
     (opt, args) = parser.parse_args()
 
