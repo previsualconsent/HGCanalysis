@@ -235,59 +235,71 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
       numberingSchemes_.push_back( new HGCNumberingScheme(cview,sdTags_[isd]) );
 
       //instantiate energy accumulators for the different layers  
-      for(std::vector<HGCalDDDConstants::hgtrform>::const_iterator trformIt=numberingSchemes_[isd]->getDDDConstants()->getFirstTrForm(); 
-	  trformIt!=numberingSchemes_[isd]->getDDDConstants()->getLastTrForm(); 
-	  trformIt++) 
+      for(std::vector<HGCalDDDConstants::hgtrap>::const_iterator modIt = numberingSchemes_[isd]->getDDDConstants()->getFirstModule();
+	  modIt != numberingSchemes_[isd]->getDDDConstants()->getLastModule();
+	  modIt++)
 	{
-	  int layerKey(trformIt->lay);
-	  std::vector<HGCalDDDConstants::hgtrap>::const_iterator modIt    = numberingSchemes_[isd]->getDDDConstants()->getFirstModule();
+	  int simLayer( modIt->lay );
+	  bool halfSector( sdTags_[isd].find("HEback")!=std::string::npos );
+	  int recoLayer ( numberingSchemes_[isd]->getDDDConstants()->simToReco(1, simLayer, halfSector ).second );
+	  
+	  bool hasRecoLayer(true);
 	  std::vector<HGCalDDDConstants::hgtrap>::const_iterator recModIt = numberingSchemes_[isd]->getDDDConstants()->getFirstModule(true);
-	  for(int ilayer=1; ilayer<abs(layerKey); ilayer++) { modIt++; recModIt++; }
-	  if(layerKey!=modIt->lay || layerKey!=recModIt->lay)
+	  if(recoLayer>0) 
 	    {
-	      std::cout << "Inconsistency found in layer " << layerKey << " between transformation struct and geometry struct for isd= " << isd << endl;
-	      continue;
+	      for(int ilayer=1; ilayer<recoLayer; ilayer++) recModIt++;
+	      if(recoLayer!=recModIt->lay)
+		{
+		  std::cout << "Inconsistency found in sim layer #" << simLayer << " reco layer #" << recModIt->lay << std::endl;
+		  continue;
+		}
 	    }
-
-	  //assign -1 if on the negative z
-	  layerKey *= trformIt->zp;
-
-	  //initiate new layer if needed
-	  std::pair<int,int> sectorKey(isd,layerKey);
-	  if(allSectors_.find(sectorKey)==allSectors_.end())
+	  else hasRecoLayer=false;
+	  
+	  //get the previous transformation if this sim layer is to be ignored
+	  int transformLayer(recoLayer);
+	  if(!hasRecoLayer) transformLayer=numberingSchemes_[isd]->getDDDConstants()->simToReco(1, simLayer-1, halfSector ).second; 
+	  
+	  //get all the sectors at +/-z for this layer
+	  for(std::vector<HGCalDDDConstants::hgtrform>::const_iterator trformIt=numberingSchemes_[isd]->getDDDConstants()->getFirstTrForm();
+	      trformIt!=numberingSchemes_[isd]->getDDDConstants()->getLastTrForm();
+	      trformIt++)
 	    {
-	      std::vector<HGCSectorAccumulator> layerSectors;
-	      allSectors_[sectorKey]=layerSectors;
+	      if(transformLayer!=trformIt->lay) continue;
+	
+	      //assign -1 if on the negative z
+	      int layerKey = simLayer*trformIt->zp;
+
+	      //initiate new layer if needed
+	      std::pair<int,int> sectorKey(isd,layerKey);
+	      if(allSectors_.find(sectorKey)==allSectors_.end())
+		{
+		  std::vector<HGCSectorAccumulator> layerSectors;
+		  allSectors_[sectorKey]=layerSectors;
+		}
+
+	      //initiate up to a new sector if needed
+	      int sector=trformIt->sec;
+	      if((int)allSectors_[sectorKey].size()<sector)
+		{
+		  for(int isec=(int)allSectors_[sectorKey].size(); isec<sector; isec++)
+		    allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,isec) );
+		}
+
+	      //configure this specific sector
+	      int isec=sector-1;
+	      double simCellSize(modIt->cellSize);         //Geant4 is in mm 
+	      double recoCellSize(hasRecoLayer ? recModIt->cellSize*10 : -1);  //it comes in cm (CMS default)
+	      allSectors_[sectorKey][isec].setGeometry(modIt->h, modIt->bl, modIt->tl, simCellSize,recoCellSize);
+
+	      //seems ok
+	      const CLHEP::Hep3Vector transl ( trformIt->h3v );
+	      const CLHEP::HepRotation hr(trformIt->hr);
+	      const HepGeom::Transform3D local2globalTr( hr, transl );
+
+	      allSectors_[sectorKey][isec].setLocal2GlobalTransformation(local2globalTr);
+	      allSectors_[sectorKey][isec].configure(*fs_);    
 	    }
-
-	  //initiate up to a new sector if needed
-	  int sector=trformIt->sec;
-	  if((int)allSectors_[sectorKey].size()<sector)
-	    {
-	      for(int isec=(int)allSectors_[sectorKey].size(); isec<sector; isec++)
-		allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,isec) );
-	    }
-
-	  //configure this specific sector
-	  int isec=sector-1;
-	  double simCellSize(modIt->cellSize);         //Geant4 is in mm 
-	  double recoCellSize(recModIt->cellSize*10);  //it comes in cm (CMS default)
-	  allSectors_[sectorKey][isec].setGeometry(modIt->h, modIt->bl, modIt->tl, simCellSize,recoCellSize);
-
-	  //seems to be rotating always to 0?
-	  const CLHEP::Hep3Vector transl ( trformIt->h3v );
-	  const CLHEP::HepRotation hr(trformIt->hr);
-	  const HepGeom::Transform3D local2globalTr( hr, transl );
-
-	  //similar if the inverse is used?
-	  //const CLHEP::HepRep3x3 rotation ( trformIt->hr.xx(), trformIt->hr.xy(), trformIt->hr.xz(),
-	  //                                  trformIt->hr.yx(), trformIt->hr.yy(), trformIt->hr.yz(),
-	  //				      trformIt->hr.zx(), trformIt->hr.zy(), trformIt->hr.zz() );
-	  //const CLHEP::HepRotation hr ( rotation );
-	  //const HepGeom::Transform3D local2globalTr( hr, trformIt->h3v );
-
-	  allSectors_[sectorKey][isec].setLocal2GlobalTransformation(local2globalTr);
-	  allSectors_[sectorKey][isec].configure(*fs_);    
 	}
     
       for(std::map< std::pair<int,int>, std::vector<HGCSectorAccumulator> >::iterator it = allSectors_.begin();
@@ -324,12 +336,12 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
       //int subSector=detId.subsector();
       
       if(allSectors_.find(sectorKey)==allSectors_.end()){
-	std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
+	//std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
 	continue;
       }
       else if(allSectors_[sectorKey].size()<size_t(sector))
 	{
-	  std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
+	  //std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
 	  continue;
 	}
 
@@ -367,12 +379,12 @@ void HGCSimHitsAnalyzer::analyzeHEDigis(size_t isd,edm::Handle<HGCHEDigiCollecti
       int cell=detId.cell();
           
       if(allSectors_.find(sectorKey)==allSectors_.end()){
-	std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
+	//std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
 	continue;
       }
       else if(allSectors_[sectorKey].size()<size_t(sector))
 	{
-	  std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
+	  //std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
 	  continue;
 	}
       
@@ -407,12 +419,12 @@ void HGCSimHitsAnalyzer::analyzeEEDigis(size_t isd,edm::Handle<HGCEEDigiCollecti
       int cell=detId.cell();
           
       if(allSectors_.find(sectorKey)==allSectors_.end()){
-	std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
+	//std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
 	continue;
       }
       else if(allSectors_[sectorKey].size()<size_t(sector))
 	{
-	  std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
+	  //std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
 	  continue;
 	}
       

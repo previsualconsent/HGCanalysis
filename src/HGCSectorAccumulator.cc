@@ -55,28 +55,38 @@ void HGCSectorAccumulator::configure(edm::Service<TFileService> &fs)
     }
 
   //init reco histos
-  ndivx      = TMath::Floor(bl_/recoCell_);
-  ndivx      = (ndivx+TMath::Floor((tl_-ndivx*recoCell_)/recoCell_));
-  ndivy      = TMath::Floor(h_/recoCell_);
-  adcH_      = fs->make<TH2F>(TString("ADC_") +id_,title_+TString(";x [mm];y [mm]"),  2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
-  gxRecoH_   = fs->make<TH2F>(TString("recogx_")+id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
-  gyRecoH_   = fs->make<TH2F>(TString("recogy_")+id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
-  gzRecoH_   = fs->make<TH2F>(TString("recogz_")+id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
-  for(int xbin=1; xbin<gxRecoH_->GetXaxis()->GetNbins(); xbin++)
+  if(recoCell_>0)
     {
-      for(int ybin=1; ybin<gxRecoH_->GetYaxis()->GetNbins(); ybin++)
+      ndivx      = TMath::Floor(bl_/recoCell_);
+      ndivx      = (ndivx+TMath::Floor((tl_-ndivx*recoCell_)/recoCell_));
+      ndivy      = TMath::Floor(h_/recoCell_);
+      adcH_      = fs->make<TH2F>(TString("ADC_") +id_,title_+TString(";x [mm];y [mm]"),  2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
+      gxRecoH_   = fs->make<TH2F>(TString("recogx_")+id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
+      gyRecoH_   = fs->make<TH2F>(TString("recogy_")+id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
+      gzRecoH_   = fs->make<TH2F>(TString("recogz_")+id_,title_+TString(";x [mm];y [mm]"),2*ndivx,-recoCell_*ndivx,recoCell_*ndivx,2*ndivy,-recoCell_*ndivy,recoCell_*ndivy);
+      for(int xbin=1; xbin<gxRecoH_->GetXaxis()->GetNbins(); xbin++)
 	{
-	  //local coordinates
-	  float localX=gxRecoH_->GetXaxis()->GetBinCenter(xbin);
-	  float localY=gxRecoH_->GetYaxis()->GetBinCenter(ybin);
-	  
-	  //local->global
-	  const HepGeom::Point3D<float> lcoord(localX,localY,0);
-	  const HepGeom::Point3D<float> gcoord( local2globalTr_*lcoord );
-	  gxRecoH_->SetBinContent(xbin,ybin,gcoord.x());
-	  gyRecoH_->SetBinContent(xbin,ybin,gcoord.y());
-	  gzRecoH_->SetBinContent(xbin,ybin,gcoord.z());
+	  for(int ybin=1; ybin<gxRecoH_->GetYaxis()->GetNbins(); ybin++)
+	    {
+	      //local coordinates
+	      float localX=gxRecoH_->GetXaxis()->GetBinCenter(xbin);
+	      float localY=gxRecoH_->GetYaxis()->GetBinCenter(ybin);
+	      
+	      //local->global
+	      const HepGeom::Point3D<float> lcoord(localX,localY,0);
+	      const HepGeom::Point3D<float> gcoord( local2globalTr_*lcoord );
+	      gxRecoH_->SetBinContent(xbin,ybin,gcoord.x());
+	      gyRecoH_->SetBinContent(xbin,ybin,gcoord.y());
+	      gzRecoH_->SetBinContent(xbin,ybin,gcoord.z());
+	    }
 	}
+    }
+  else
+    {
+      adcH_=0;
+      gxRecoH_=0;
+      gyRecoH_=0;
+      gzRecoH_=0;
     }
 }
 
@@ -123,9 +133,9 @@ TVector3 HGCSectorAccumulator::getGlobalPointAt(int bin)
 //
 TVector3 HGCSectorAccumulator::getRecoGlobalPointAt(int bin)
 {
-  TVector3 xyz(gxRecoH_->GetBinContent(bin),
-	       gyRecoH_->GetBinContent(bin),
-	       gzRecoH_->GetBinContent(bin) 
+  TVector3 xyz(gxRecoH_ ? gxRecoH_->GetBinContent(bin) : 0,
+	       gyRecoH_ ? gyRecoH_->GetBinContent(bin) : 0,
+	       gzRecoH_ ? gzRecoH_->GetBinContent(bin) : 0
 	       );
   return xyz;
 }
@@ -142,9 +152,13 @@ TVector2 HGCSectorAccumulator::getLocalPointAt(int bin)
 //
 TVector2 HGCSectorAccumulator::getRecoLocalPointAt(int bin)
 {
-  Int_t binx,biny,binz;
-  gxRecoH_->GetBinXYZ(bin,binx,biny,binz);
-  TVector2 xy(gxRecoH_->GetXaxis()->GetBinCenter(binx), gxRecoH_->GetYaxis()->GetBinCenter(biny));
+  TVector2 xy(0,0);
+  if(gxRecoH_)
+    {
+      Int_t binx,biny,binz;
+      gxRecoH_->GetBinXYZ(bin,binx,biny,binz);
+      xy=TVector2(gxRecoH_->GetXaxis()->GetBinCenter(binx), gxRecoH_->GetYaxis()->GetBinCenter(biny));
+    }
   return xy;
 }
 
