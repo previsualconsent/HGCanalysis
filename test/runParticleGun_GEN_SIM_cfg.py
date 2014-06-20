@@ -10,7 +10,8 @@ process.load('Configuration.EventContent.EventContent_cff')
 process.load('SimGeneral.MixingModule.mixNoPU_cfi')
 process.load('Configuration.Geometry.GeometryExtended2023HGCalMuonReco_cff')
 process.load('Configuration.Geometry.GeometryExtended2023HGCalMuon_cff')
-process.load('Configuration.StandardSequences.MagneticField_38T_PostLS1_cff')
+#process.load('Configuration.StandardSequences.MagneticField_38T_PostLS1_cff')
+process.load('Configuration.StandardSequences.MagneticField_0T_cff')
 process.load('Configuration.StandardSequences.Generator_cff')
 process.load('IOMC.EventVertexGenerators.VtxSmearedRealistic8TeVCollision_cfi')
 process.load('GeneratorInterface.Core.genFilterSummary_cff')
@@ -22,16 +23,16 @@ process.load('Configuration.StandardSequences.SimL1Emulator_cff')
 process.load('Configuration.StandardSequences.DigiToRaw_cff')
 
 #customize geometry
-geometry=XXX_GEOM_XXX
-geometryPostFix=''
-for item in process.XMLIdealGeometryESSource.geomXMLFiles :
-	if geometry=='OnlyHGCEE':
-		geometryPostFix='_onlyEE'
-	if geometry=='OnlyHGCHEback':
-		geometryPostFix='_onlyHEback'
-	if geometry=='OnlyHGCHEfront':
-		geometryPostFix='_onlyHEfront'
-process.XMLIdealGeometryESSource.geomXMLFiles = customGeomXMLFiles
+#geometry=XXX_GEOM_XXX
+#geometryPostFix=''
+#for item in process.XMLIdealGeometryESSource.geomXMLFiles :
+#	if geometry=='OnlyHGCEE':
+#		geometryPostFix='_onlyEE'
+#	if geometry=='OnlyHGCHEback':
+#		geometryPostFix='_onlyHEback'
+#	if geometry=='OnlyHGCHEfront':
+#		geometryPostFix='_onlyHEfront'
+#process.XMLIdealGeometryESSource.geomXMLFiles = customGeomXMLFiles
 	
 process.maxEvents = cms.untracked.PSet(
     input = cms.untracked.int32(250)

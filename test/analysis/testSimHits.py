@@ -15,17 +15,27 @@ from UserCode.HGCanalysis.HGCLayerUtils import *
 Wrapper to store hits
 """
 class HitIntegrator:
-  def __init__(self):
+  def __init__(self,accMap):
+    self.subDets=[]
     self.varNames=[]
-    self.subDets=['ec1','ec2','ec3','hc1','hc2']
-    self.vars=['avgdeta','avgdphi','en','endr1','endr25','endr5']
+    for subDet in accMap:
+      for layer in accMap[subDet]:
+        self.subDets.append( self.getKeyFor(subDet, layer ) )
+    self.vars=['avgdeta','avgdphi','en','endr01']
     self.hitsCollection={}
     for subDet in self.subDets:
       self.hitsCollection[subDet]={}
       for var in self.vars:
         self.hitsCollection[subDet][var]=0
         self.varNames.append('%s_%s'%(subDet,var))
-        
+
+  def getKeyFor(self,subDet,layer):
+    key='s%d'%subDet
+    if layer<0 : key+='m'
+    else       : key+='p'
+    key+='%d'%abs(layer)
+    return key
+  
   def resetHits(self):
     for subDet in self.hitsCollection:
       for var in self.hitsCollection[subDet]:
@@ -43,25 +53,18 @@ class HitIntegrator:
   def integrateHit(self,subDet,layer,edep,deltaEta,deltaPhi):
 
     #assign sub detector
-    subDetName=None
-    if subDet==0:
-      if layer<=11   : subDetName='ec1'
-      elif layer<=21 : subDetName='ec2'
-      else           : subDetName='ec3'
-    if subDet==1     : subDetName='hc1'
-    if subDet==2     : subDetName='hc2'
+    key=self.getKeyFor(subDet,layer)
 
     #compute the variables of interest
     deltaR=TMath.Sqrt(deltaEta*deltaEta+deltaPhi*deltaPhi)
     iVarVal={'avgdeta'    : deltaEta*edep,
              'avgdphi'    : deltaPhi*edep,
              'en'       : edep,
-             'endr1'  : 0. if deltaR>0.1  else edep,
-             'endr25' : 0. if deltaR>0.25 else edep,
-             'endr5'  : 0. if deltaR>0.5  else edep }
+             'endr01'  : 0. if deltaR>0.1  else edep
+             }
     for var in iVarVal:
-      curVal=self.hitsCollection[subDetName][var]+iVarVal[var]
-      self.hitsCollection[subDetName][var]=curVal
+      curVal=self.hitsCollection[key][var]+iVarVal[var]
+      self.hitsCollection[key][var]=curVal
     
 
 """
@@ -73,7 +76,7 @@ def integrateSimHits(fInUrl,fout,accMap,treeName='hgcSimHitsAnalyzer/HGC'):
   gROOT.SetBatch(False)
   gStyle.SetPalette(51)
 
-  hitIntegrator=HitIntegrator()
+  hitIntegrator=HitIntegrator(accMap)
 
   fout.cd()
   output_tuple = ROOT.TNtuple("HGC","HGC","genPt:genEta:genPhi:"+":".join(hitIntegrator.getVarNames()))
@@ -86,39 +89,40 @@ def integrateSimHits(fInUrl,fout,accMap,treeName='hgcSimHitsAnalyzer/HGC'):
     HGC.GetEntry(iev)
 
     sys.stdout.write( '\r Status [%d/%d]'%(iev,HGC.GetEntries()))
-      
-    #require 1 single particle
+       
     if HGC.ngen==0 or HGC.ngen>2 : continue
-    genPt=HGC.gen_pt[0]
-    genEta=HGC.gen_eta[0]
-    genPhi=HGC.gen_phi[0]
-
-    #require some hits
     if HGC.nhits==0 : continue
 
-    hitIntegrator.resetHits()
-    for n in xrange(0,HGC.nhits):
+    #create a new entry for each new particle (particle gun may have two shot in opposite eta)
+    for ngen in xrange(0,HGC.ngen):
+
+      genPt=HGC.gen_pt[ngen]
+      genEta=HGC.gen_eta[ngen]
+      genPhi=HGC.gen_phi[ngen]
+
+      hitIntegrator.resetHits()
+
+      for n in xrange(0,HGC.nhits):
       
-      sdType=HGC.hit_type[n]
-      
-      layer=HGC.hit_layer[n]
-      sec=HGC.hit_sec[n]
-      bin=HGC.hit_bin[n]
-      rho,eta,phi=accMap[sdType][layer].getGlobalCoordinates(sec,bin)
-      
-      if eta*genEta<0 : continue
+        sdType=HGC.hit_type[n]
+        layer=HGC.hit_layer[n]
+        sec=HGC.hit_sec[n]
+        bin=HGC.hit_bin[n]
+        rho,eta,phi=accMap[sdType][layer].getGlobalCoordinates(sec,bin)
 
-      edep=HGC.hit_edep[n]
+        #filter hits to match the eta of the generated particle
+        if eta*genEta<0 : continue
 
-      deltaPhi=TVector2.Phi_mpi_pi(phi-genPhi)
-      deltaEta=eta-genEta
+        #integrate hit
+        edep=HGC.hit_edep[n]
+        deltaPhi=TVector2.Phi_mpi_pi(phi-genPhi)
+        deltaEta=eta-genEta
+        hitIntegrator.integrateHit(sdType,abs(layer),edep,deltaEta,deltaPhi)
 
-      hitIntegrator.integrateHit(sdType,abs(layer),edep,deltaEta,deltaPhi)
-
-    varVals=[genPt,genEta,genPhi]+hitIntegrator.getVarVals()
-    #print varVals
-    output_tuple.Fill(array.array("f",varVals))
-    if iev%5000 : output_tuple.AutoSave('SaveSelf')
+      #fill the ntuple
+      varVals=[genPt,genEta,genPhi]+hitIntegrator.getVarVals()
+      output_tuple.Fill(array.array("f",varVals))
+      if iev%5000 : output_tuple.AutoSave('SaveSelf')
 
   #write the ntuple
   fout.cd()

@@ -45,25 +45,25 @@ using namespace std;
 //
 
 class MyEDMtoHEPMCAnalyzer : public edm::EDAnalyzer {
-   public:
-      explicit MyEDMtoHEPMCAnalyzer(const edm::ParameterSet&);
-      ~MyEDMtoHEPMCAnalyzer();
-
-      static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
-
-
-   private:
-      virtual void beginJob() ;
-      virtual void analyze(const edm::Event&, const edm::EventSetup&);
-      virtual void endJob() ;
-
-      virtual void beginRun(edm::Run const&, edm::EventSetup const&);
-      virtual void endRun(edm::Run const&, edm::EventSetup const&);
-      virtual void beginLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&);
-      virtual void endLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&);
-
-      // ----------member data ---------------------------
-
+public:
+  explicit MyEDMtoHEPMCAnalyzer(const edm::ParameterSet&);
+  ~MyEDMtoHEPMCAnalyzer();
+  
+  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
+  
+  
+private:
+  virtual void beginJob() ;
+  virtual void analyze(const edm::Event&, const edm::EventSetup&);
+  virtual void endJob() ;
+  
+  virtual void beginRun(edm::Run const&, edm::EventSetup const&);
+  virtual void endRun(edm::Run const&, edm::EventSetup const&);
+  virtual void beginLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&);
+  virtual void endLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&);
+  
+  // ----------member data ---------------------------
+  
   HepMC::IO_GenEvent ascii_out;
 };
 
@@ -105,13 +105,14 @@ MyEDMtoHEPMCAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& i
    using namespace edm;
 
    // here's an example of accessing GenEventInfoProduct
-   Handle< GenEventInfoProduct > GenInfoHandle;
-   iEvent.getByLabel( "generator", GenInfoHandle );
-   double qScale = GenInfoHandle->qScale();
-   double pthat = ( GenInfoHandle->hasBinningValues() ? 
-		    (GenInfoHandle->binningValues())[0] : 0.0);
-   cout << " qScale = " << qScale << " pthat = " << pthat << endl;
-
+   /*
+     Handle< GenEventInfoProduct > GenInfoHandle;
+     iEvent.getByLabel( "generator", GenInfoHandle );
+     double qScale = GenInfoHandle->qScale();
+     double pthat = ( GenInfoHandle->hasBinningValues() ? 
+     (GenInfoHandle->binningValues())[0] : 0.0);
+     cout << " qScale = " << qScale << " pthat = " << pthat << endl;
+   */
 
    Handle< HepMCProduct > EvtHandle ;
    iEvent.getByLabel( "generator", EvtHandle ) ;
