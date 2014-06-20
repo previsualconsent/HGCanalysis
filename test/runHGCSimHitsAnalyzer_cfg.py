@@ -2,9 +2,13 @@ import FWCore.ParameterSet.Config as cms
 
 process = cms.Process("HGCSimHitsAnalysis")
 
+process.load('Configuration.StandardSequences.Services_cff')
+process.load('SimGeneral.HepPDTESSource.pythiapdt_cfi')    
+process.load('FWCore.MessageService.MessageLogger_cfi') 
 process.load('Configuration.Geometry.GeometryExtended2023HGCalMuonReco_cff')
-process.load('Configuration.Geometry.GeometryExtended2023HGCalMuon_cff')
-process.load('Configuration.StandardSequences.MagneticField_38T_cff')
+#process.load('Configuration.Geometry.GeometryExtended2023HGCalMuon_cff')
+process.load('Configuration.StandardSequences.MagneticField_38T_PostLS1_cff')
+
 
 ffile=0
 step=-1
