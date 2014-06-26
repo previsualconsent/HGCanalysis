@@ -149,6 +149,7 @@ def main():
     fInUrl=[]
     for f in lsOutput:
       if f.find(opt.tag)<0 : continue
+      print f
       fInUrl.append( commands.getstatusoutput('cmsPfn '+f)[1] )
     if len(fInUrl)==0:
       print 'No files matching %s in %s have been found'%(opt.tag,opt.input)
