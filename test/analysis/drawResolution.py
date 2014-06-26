@@ -1,15 +1,93 @@
 #!/usr/bin/env python
 
 import ROOT
-from UserCode.HGCanalysis.PlotUtils import *
-import numpy as np
+from PlotUtils import *
+import numpy as numpy
 from array import array
-import sys
+import io,os,sys
+import json
+    
+"""
+Converts all to a workspace and returns optimized weights
+"""
+def prepareWorkspace(url,integSD,integRanges,mipEn,genM,outUrl):
+    
+    #prepare the workspace
+    ws=ROOT.RooWorkspace("w")
+    dsVars=ROOT.RooArgSet( ws.factory('pt[0,0,9999999999]'),  ws.factory('eta[1.5,1.45,3.1]'), ws.factory('en[0,0,9999999999]') )
+    for ireg in xrange(0,len(integRanges)): dsVars.add( ws.factory('edep%d[0,0,99999999]'%ireg) )
+    getattr(ws,'import')( ROOT.RooDataSet('data','data',dsVars) )
+
+    #optimization with linear regression
+    optimVec    = numpy.zeros( len(integRanges)+1 )
+    optimMatrix = numpy.zeros( (len(integRanges)+1, len(integRanges)+1 ) )
+
+    #read all to a RooDataSet
+    fin=ROOT.TFile.Open(url)
+    HGC=fin.Get('HGC')
+    for entry in xrange(0,HGC.GetEntriesFast()+1):
+
+        HGC.GetEntry(entry)
+
+        genEta=ROOT.TMath.Abs(HGC.genEta)
+        if genEta<1.5 or genEta>2.9 : continue
+        ws.var('eta').setVal(genEta)
+
+        genPt=HGC.genPt
+        genPl=genPt*ROOT.TMath.SinH(genEta)
+        ws.var('pt').setVal(genPt)
+        genP=genPt*ROOT.TMath.CosH(genEta)
+        genEn=ROOT.TMath.Sqrt(genP*genP+genM*genM)
+        ws.var('en').setVal(genEn)
+        genY=0.5*ROOT.TMath.Log((genEn+genPl)/(genEn-genPl))
+
+        newEntry=ROOT.RooArgSet( ws.var('pt'),  ws.var('eta'), ws.var('en') )
+
+        #get the relevant energy deposits and add new row
+        edeps=[]
+        for ireg in xrange(0,len(integRanges)):
+            sdPrefix='s%dp'%integSD[ireg]
+            if HGC.genEta<0 : sdPrefix='s%dm'%integSD[ireg]
+            totalEnInIntegRegion=0
+            for ilayer in xrange(integRanges[ireg][0],integRanges[ireg][1]+1):
+                enCorr=ROOT.TMath.Abs(ROOT.TMath.TanH(genEta)*1e6/mipEn[ireg])
+                totalEnInIntegRegion=totalEnInIntegRegion+(getattr(HGC,sdPrefix+'%d_en'%ilayer))*enCorr
+            edeps.append(totalEnInIntegRegion)
+            ws.var('edep%d'%ireg).setVal(totalEnInIntegRegion)
+            newEntry.add(ws.var('edep%d'%(ireg)))
+
+        #a mip veto
+        #if ws.var('edep0').getVal()>1 : continue
+            
+        ws.data('data').add( newEntry )
+
+        #fill the optmization matrix and vector
+        for ie in xrange(0,len(edeps)):
+            optimVec[ie]=optimVec[ie]+edeps[ie]*genEn
+            for je in xrange(0,len(edeps)):
+                optimMatrix[ie][je]=optimMatrix[ie][je]+edeps[ie]*edeps[je]
+            optimMatrix[len(edeps)][ie]=optimMatrix[len(edeps)][ie]+edeps[ie]
+            optimMatrix[ie][len(edeps)]=optimMatrix[ie][len(edeps)]+edeps[ie]
+        optimMatrix[len(edeps)][len(edeps)]=optimMatrix[len(edeps)][len(edeps)]+1
+        optimVec[len(edeps)]=optimVec[len(edeps)]+genEn
+        
+    fin.Close()
+
+    #all done, write to file
+    ws.writeToFile(outUrl,True)
+
+    #finalize weight optimization
+    optimWeights=numpy.linalg.solve(optimMatrix,optimVec)
+
+    #all done here
+    return optimWeights
+
+    
 
 """
 runs the fits to the calibration and resolution
 """
-def showEMcalibrationResults(calibFunc,resFunc):
+def showEMcalibrationResults(calibFunc,resFunc,outDir):
 
     resolSummary=[]
 
@@ -19,17 +97,20 @@ def showEMcalibrationResults(calibFunc,resFunc):
     fitFunc=ROOT.TF1('resolmodel',"sqrt([0]*x*x+[1])",0,1)
     #fitFunc=ROOT.TF1('resolmodel',"sqrt([0]*x*x+[1]+[2]*x*x*x*x)",0,1)
     fitFunc.SetParameter(0,0.2);
-    fitFunc.SetParLimits(0,0,1);
+    fitFunc.SetParLimits(0,0,2);
     fitFunc.SetParameter(1,0);
-    fitFunc.SetParLimits(1,0,0.3);
+    fitFunc.SetParLimits(1,0,1.0);
+    fitFunc.SetLineWidth(1)
 
-    c=ROOT.TCanvas('cresol','cresol',500,500)
+    c=ROOT.TCanvas('cresol','cresol',1200,500)
     c.SetTopMargin(0.05)
-    leg=ROOT.TLegend(0.15,0.6,0.5,0.93)
+    c.SetRightMargin(0.5)
+    leg=ROOT.TLegend(0.52,0.1,0.99,0.2+0.085*len(calibFunc)/3)
+    leg.SetNColumns(3)
     leg.SetBorderSize(0)
     leg.SetFillStyle(0)
     leg.SetTextFont(42)
-    leg.SetTextSize(0.04)
+    leg.SetTextSize(0.025)
     for ir in xrange(0,len(resFunc)):
         if ir==0:
             resFunc[ir].Draw('ap')
@@ -40,23 +121,28 @@ def showEMcalibrationResults(calibFunc,resFunc):
             resFunc[ir].GetXaxis().SetTitleSize(0.05)
             resFunc[ir].GetYaxis().SetTitleSize(0.05)
             resFunc[ir].GetYaxis().SetTitleOffset(1.3)
-            resFunc[ir].GetYaxis().SetRangeUser(0,0.25)
+            maxY=resFunc[ir].GetMaximum()
+            resFunc[ir].GetYaxis().SetRangeUser(0,1.0)
+            #resFunc[ir].GetYaxis().SetRangeUser(0,0.1)
         else:
             resFunc[ir].Draw('p')
 
         resFunc[ir].Fit(fitFunc,'MER+')
+        resFunc[ir].GetFunction(fitFunc.GetName()).SetLineColor(resFunc[ir].GetLineColor())
+        sigmaStochErr=0
         sigmaStoch=ROOT.TMath.Sqrt(fitFunc.GetParameter(0));
-        sigmaStochErr=fitFunc.GetParError(0)/(2*ROOT.TMath.Sqrt(sigmaStoch))
+        if sigmaStoch>0 : sigmaStochErr=fitFunc.GetParError(0)/(2*ROOT.TMath.Sqrt(sigmaStoch))
         sigmaConstErr=0
         sigmaConst=ROOT.TMath.Sqrt(fitFunc.GetParameter(1))
-        sigmaConstErr=fitFunc.GetParError(1)/(2*ROOT.TMath.Sqrt(sigmaConst))
+        if sigmaConst>0 : sigmaConstErr=fitFunc.GetParError(1)/(2*ROOT.TMath.Sqrt(sigmaConst))
         #sigmaNoise=ROOT.TMath.Sqrt(fitFunc.GetParameter(2))
         #sigmaNoiseErr=fitFunc.GetParError(2)/(2*ROOT.TMath.Sqrt(sigmaNoise))
 
         leg.AddEntry(resFunc[ir],
                      #"#splitline{[#bf{#it{%s}}]}{#frac{#sigma}{E} #propto #frac{%3.3f #pm %3.3f}{#sqrt{E}} #oplus %3.4f#pm%3.4f}"
-                     "[#bf{#it{%s}}] #frac{#sigma}{E} #propto #frac{%3.4f #pm %3.4f}{#sqrt{E}} #oplus %3.5f#pm%3.5f"
-                     %(resFunc[ir].GetTitle(),sigmaStoch,sigmaStochErr,sigmaConst,sigmaConstErr),
+                     #"[#bf{#it{%s}}] #frac{#sigma}{E} #propto #frac{%3.4f #pm %3.4f}{#sqrt{E}} #oplus %3.5f#pm%3.5f"
+                     "#splitline{[#scale[0.8]{#bf{#it{%s}}}]}{#frac{#sigma}{E} #propto #frac{%3.4f}{#sqrt{E}} #oplus %3.5f}"
+                     %(resFunc[ir].GetTitle(),sigmaStoch,sigmaConst),
                      "fp")
         
         resolSummary.append( [sigmaStoch,sigmaStochErr,sigmaConst,sigmaConstErr] )
@@ -66,20 +152,23 @@ def showEMcalibrationResults(calibFunc,resFunc):
     MyPaveText('CMS simulation')
     c.Modified()
     c.Update()
-    #for ext in ['png','pdf','C'] : c.SaveAs(outdir+'/resol.%s'%ext)
+    for ext in ['png','pdf','C'] : c.SaveAs('%s/resolution.%s'%(outDir,ext))
 
+    
     #
     #calibration
     #
     calibModel=ROOT.TF1('calibmodel',"[0]*x+[1]",0,800)
     
-    c=ROOT.TCanvas('ccalib','ccalib',500,500)
+    c=ROOT.TCanvas('ccalib','ccalib',1200,500)
     c.SetTopMargin(0.05)
-    leg=ROOT.TLegend(0.53,0.15,0.9,0.5)
+    c.SetRightMargin(0.5)
+    leg=ROOT.TLegend(0.52,0.1,0.99,0.2+0.085*len(calibFunc)/3)
+    leg.SetNColumns(3)
     leg.SetBorderSize(0)
     leg.SetFillStyle(0)
     leg.SetTextFont(42)
-    leg.SetTextSize(0.03)
+    leg.SetTextSize(0.025)
     for ir in xrange(0,len(calibFunc)):
         
         if ir==0:
@@ -95,14 +184,16 @@ def showEMcalibrationResults(calibFunc,resFunc):
             calibFunc[ir].Draw('p')
         
         calibFunc[ir].Fit(calibModel,'MER+')
+        calibFunc[ir].GetFunction(calibModel.GetName()).SetLineColor(calibFunc[ir].GetLineColor())
         slope=calibModel.GetParameter(0)
         slopeErr=calibModel.GetParError(0)
         offset=calibModel.GetParameter(1)
         offsetErr=calibModel.GetParError(1)
 
         leg.AddEntry(calibFunc[ir],
-                     "#splitline{[#bf{#it{%s}}]}{E #propto (%3.1f#pm%3.1f)#timesE_{rec} +%3.0f#pm%3.0f}"
-                     %(calibFunc[ir].GetTitle(),slope,slopeErr,offset,offsetErr),
+                     #"#splitline{[#bf{#it{%s}}]}{E #propto (%3.1f#pm%3.1f)#timesE_{rec} +%3.0f#pm%3.0f}"
+                     "#splitline{[#scale[0.8]{#bf{#it{%s}}}]}{#hat{E} = %3.1f#timesE_{beam} + %3.0f}"
+                     %(calibFunc[ir].GetTitle(),slope,offset),
                      "fp")
 
         resolSummary[ir].append(slope)
@@ -114,140 +205,197 @@ def showEMcalibrationResults(calibFunc,resFunc):
     MyPaveText('CMS simulation')
     c.Modified()
     c.Update()
-    #for ext in ['png','pdf','C'] : c.SaveAs(outdir+'/calib.%s'%ext)
+    for ext in ['png','pdf','C'] : c.SaveAs('%s/calibration.%s'%(outDir,ext))
 
     return resolSummary
 
-customROOTstyle()
-ROOT.gROOT.SetBatch(False)
-
-ROOT.gStyle.SetOptTitle(0)
-ROOT.gStyle.SetOptStat(0)
 
 """
 """
-def runResolutionStudy(vars=[["recEn","#Sigma w_{i}E_{i}"],["recEnDR1","#Sigma_{#Delta R<0.1}w_{i}E_{i}"]],
-                       wgt=[1.,3.3/1.6,5.6/1.6],
-                       mipEn=55.1,
-                       url='cmssw/SingleElectron_v15.root'):
+def runResolutionStudy(url,genM):
 
-    #prepare the workspace
-    ws=ROOT.RooWorkspace("w")
-    dsVars=ROOT.RooArgSet( ws.factory('pt[0,0,9999999999]'), ws.factory('en[0,0,9999999999]') )
-    varNames=[]
-    for var,varTitle in vars:
-        dsVars.add( ws.factory('%s[0,0,9999999999]'%var) )
-        varNames.append(var)
-    getattr(ws,'import')( ROOT.RooDataSet('data','data',dsVars) )
+    mipEn      = [55.1,        55.1,        55.1,        55.1,        85.0,     1498.4]   
+    integSD    = [0,           0,           0,           0,           1,        2]
+    integRanges= [[1,1],       [2,11],      [12,21],     [22,31],     [1,12],   [1,10]]
+    #defWeights = [0.209/0.494, 0.494/0.494, 0.797/0.494, 1.207/0.494, 0.,       0.,      0.]
+    defWeights = [0.028,       0.065,        0.105,       0.160,      1.0,       1.667,   0.]
 
-    binGenEn = [10,20,30,40,50,75,100,150,200,250,400] #,400,600,1000]
-    hen=ROOT.TH1F('hgen',';Generated energy [GeV];Events',len(binGenEn)-1,array('f',binGenEn))
-    hen.SetDirectory(0)
 
-    #read all to a RooDataSet
-    fin=ROOT.TFile.Open('cmssw/SingleElectron_v15.root')
-    HGC=fin.Get('HGC')
-    for entry in xrange(0,HGC.GetEntriesFast()+1):
 
-        HGC.GetEntry(entry)
-        
-        if ROOT.TMath.Abs(HGC.genEta)<1.6 or ROOT.TMath.Abs(HGC.genEta)>2.9 : continue
-        #if ROOT.TMath.Abs(HGC.genEta)<2 or ROOT.TMath.Abs(HGC.genEta)>2.2 : continue
-        #if ROOT.TMath.Abs(HGC.genEta)<2.5 or ROOT.TMath.Abs(HGC.genEta)>2.6 : continue
-        #if ROOT.TMath.Abs(HGC.genEta)<2.8 or ROOT.TMath.Abs(HGC.genEta)>2.9 : continue
-            
-        ws.var('pt').setVal(HGC.genPt)
-        ws.var('en').setVal(HGC.genPt*ROOT.TMath.CosH(HGC.genEta))
-        hen.Fill( ws.var('en').getVal() )
-        newEntry=ROOT.RooArgSet( ws.var('pt'), ws.var('en') )
 
-        #energy estimators
-        enCorr=(ROOT.TMath.TanH(HGC.genEta)*1e6/mipEn)/ws.var('en').getVal()
-        if 'recEn' in varNames:
-            ws.var('recEn').setVal(     (wgt[0]*HGC.ec1_en     + wgt[1]*HGC.ec2_en     + wgt[2]*HGC.ec3_en)*enCorr )
-            newEntry.add( ws.var('recEn') )
-        if 'recEnDR1' in varNames:
-            ws.var('recEnDR1').setVal(  (wgt[0]*HGC.ec1_endr1  + wgt[1]*HGC.ec2_endr1  + wgt[2]*HGC.ec3_endr1 )*enCorr )
-            newEntry.add( ws.var('recEnDR1') )
-        if 'recEnDR25' in varNames:
-            ws.var('recEnDR25').setVal( (wgt[0]*HGC.ec1_endr25 + wgt[1]*HGC.ec2_endr25 + wgt[3]*HGC.ec3_endr25)*enCorr )
-            newEntry.add( ws.var('recEnDR25') )
-        if 'recEnDR5' in varNames:
-            ws.var('recEnDR5').setVal(  (wgt5[0]*HGC.ec1_endr5  + wgt[1]*HGC.ec2_endr5  + wgt[3]*HGC.ec3_endr5 )*enCorr )
-            newEntry.add( ws.var('recEnDR5') )
-        ws.data('data').add( newEntry )
-    fin.Close()
+    #read particle gun configuration
+    pGunF=ROOT.TFile.Open('particle_gun_pdf.root')
+    pGunPt=pGunF.Get("pt")
+    pGunPtRanges=[]
+    for np in xrange(0,pGunPt.GetN()):
+        x,y=ROOT.Double(0),ROOT.Double(0)
+        pGunPt.GetPoint(np,x,y)
+        if y>0: 
+            pGunPtRanges.append([x])
+            nrang=len(pGunPtRanges)
+            if nrang==1: continue
+            dPt=0.25*(pGunPtRanges[nrang-1][0]-pGunPtRanges[nrang-2][0])
+            pGunPtRanges[nrang-1].append(dPt)
+            if nrang==2: pGunPtRanges[0].append(dPt)
+    pGunY=pGunF.Get("rapidity")
+    pGunYRanges=[]
+    for np in xrange(0,pGunY.GetN()):
+        x,y=ROOT.Double(0),ROOT.Double(0)
+        pGunY.GetPoint(np,x,y)
+        if y>0: 
+            pGunYRanges.append([x])
+            nrang=len(pGunYRanges)
+            if nrang==1: continue
+            dY=0.25*(pGunYRanges[nrang-1][0]-pGunYRanges[nrang-2][0])
+            pGunYRanges[nrang-1].append(dY)
+            if nrang==2: pGunYRanges[0].append(dY)
+    pGunF.Close()
 
-     
+    #prepare output
+    outDir=url.replace('.root','')
+    os.system('mkdir -p '+outDir)
+
+    #get workspace
+    wsOutUrl=url.replace('.root','_ws.root')    
+    optimWeights=prepareWorkspace(url=url,integSD=integSD,integRanges=integRanges,mipEn=mipEn,genM=genM,outUrl=url.replace('.root','_ws.root'))
+    wsOutF=ROOT.TFile.Open(wsOutUrl)
+    ws=wsOutF.Get('w')
+    wsOutF.Close()
+
+    #output weights to a file
+    calibrationData={}
+    calibrationData['IntegrationRanges'] = [ {'first':fLayer, 'last':lLayer} for fLayer,lLayer in integRanges ]
+    calibrationData['IntegrationSubDet'] = [ item for item in integSD ]
+    calibrationData['MIPinKeV']          = [ item for item in mipEn ]
+    calibrationData['DefaultWeights']    = [ item for item in defWeights ]
+    calibrationData['OptimWeights']      = [ item for item in optimWeights ]
+    with io.open('%s/weights.dat'%outDir, 'w', encoding='utf-8') as f: f.write(unicode(json.dumps(calibrationData, sort_keys = True, ensure_ascii=False, indent=4)))
+
+    #prepare energy estimators
+    funcArgs='{edep0'
+    rawEnFunc,weightEnFunc,optimWeightEnFunc='edep0','%f*edep0'%defWeights[0],'%f*edep0'%optimWeights[0]
+    for ireg in xrange(1,len(integRanges)) :
+        funcArgs          += ',edep%d'%(ireg)
+        rawEnFunc         += '+edep%d'%(ireg)
+        weightEnFunc      += '+%f*edep%d'%(defWeights[ireg],ireg)
+        optimWeightEnFunc += '+%f*edep%d'%(optimWeights[ireg],ireg)
+    weightEnFunc      += '+%f'%defWeights[len(defWeights)-1]
+    optimWeightEnFunc += '+%f'%optimWeights[len(optimWeights)-1]
+    funcArgs=funcArgs+',en}'
+    vars=[
+        [ws.data('data').addColumn(ws.factory("RooFormulaVar::rawEnFunc('("+rawEnFunc+")/en',"+funcArgs+")" )),                '#Sigma E_{i}'],
+        [ws.data('data').addColumn(ws.factory("RooFormulaVar::weightEnFunc('("+weightEnFunc+")/en',"+funcArgs+")")),           '#Sigma w_{i}E_{i}' ],
+        [ws.data('data').addColumn(ws.factory("RooFormulaVar::optimWeightEnFunc('("+optimWeightEnFunc+")/en',"+funcArgs+")")), '#Sigma w^{optim}_{i}E_{i}']
+        ]
+    enEstimatorsSet=ROOT.RooArgSet(ws.var('pt'),ws.var('eta'),ws.var('en'))
+    for v in vars:
+        vName=v[0].GetName().replace('Func','')
+        enEstimatorsSet.add( ws.factory('%s[0,0,999999999]'%vName) )
+    getattr(ws,'import')( ROOT.RooDataSet('fitdata','fitdata',enEstimatorsSet) )
+
+    #create the fit dataset (skip direct usage of RooFormulaVar in a fit) and store final value
+    for ientry in xrange(0,ws.data('data').numEntries()):
+        entryVars=ws.data('data').get(ientry)
+        for baseVar in ['pt','eta','en']: ws.var(baseVar).setVal( entryVars.find(baseVar).getVal() )
+        newEntry=ROOT.RooArgSet( ws.var('pt'),  ws.var('eta'), ws.var('en') )
+        for v in vars:
+            vName=v[0].GetName().replace('Func','')
+            ws.var(vName).setVal( v[0].getVal() )
+            newEntry.add( ws.var(vName) )
+        ws.data('fitdata').add( newEntry )
+    
     #prepare to fit the energy slices
     calibFunc=[]
     resFunc=[]
     c=ROOT.TCanvas('c','c',1400,800)
+    varCtr=0
     for var,varTitle in vars:
-        nv=len(calibFunc)
-        calibFunc.append(ROOT.TGraphErrors())
-        calibFunc[nv].SetMarkerStyle(20+nv)
-        calibFunc[nv].SetTitle(varTitle)
-        calibFunc[nv].SetFillStyle(0)
-        calibFunc[nv].SetName('calib_'+var)    
-        resFunc.append(calibFunc[nv].Clone('resol_'+var))
+        varCtr+=1
+        vName=var.GetName().replace('Func','')
 
-        #run resolution fits in different energy ranges
-        c.Clear()
-        c.Divide(hen.GetXaxis().GetNbins()/3+1,3)
-        ipad=0
-        for ibin in xrange(1,hen.GetXaxis().GetNbins()+1):
-            ipad=ipad+1
-            postfix='fit%d'%ipad
-            enmin=hen.GetXaxis().GetBinLowEdge(ibin)
-            enmax=hen.GetXaxis().GetBinUpEdge(ibin)
-            redData = ws.data('data').reduce("en>=%f && en<=%f"%(enmin,enmax))
-            if redData.sumEntries()<10 : continue
-            redDataMean=redData.mean(ws.var(var))
-            redDataSigma=redData.sigma(ws.var(var))
-            ws.var(var).setRange(postfix,redDataMean-6*redDataSigma,redDataMean+6*redDataSigma)
-            ws.var(var).setRange('fit'+postfix,redDataMean-1.5*redDataSigma,redDataMean+1.5*redDataSigma)
-            ws.factory('Gaussian::g_%s(%s,mean_%s[%f,%f,%f],sigma_%s[%f,%f,%f])'%
-                       (postfix,var,
-                        postfix,redDataMean,redDataMean-5*redDataSigma,redDataMean+5*redDataSigma,
-                           postfix,redDataSigma,redDataSigma/2,redDataSigma*2)
-                )
+        #run resolution fits in different rapidity ranges
+        for iyrang in xrange(1,len(pGunYRanges)-2):
 
-            #fit
-            fres=ws.pdf('g_%s'%postfix).fitTo( redData,ROOT.RooFit.Range('fit'+postfix),ROOT.RooFit.Save(True))
-            meanFit=ws.var('mean_%s'%postfix).getVal()
-            meanFitError=ws.var('mean_%s'%postfix).getError()
-            sigmaFit=ws.var('sigma_%s'%postfix).getVal()
-            sigmaFitError=ws.var('sigma_%s'%postfix).getError()
+            yRang=pGunYRanges[iyrang]
 
-            np=calibFunc[nv].GetN()
-            meanGenEn=0.5*(enmax+enmin)
-            meanGenEnErr=0.5*(enmax-enmin)
-            calibFunc[nv].SetPoint(np,meanGenEn,meanFit*meanGenEn)
-            calibFunc[nv].SetPointError(np,meanGenEnErr,meanFitError*meanGenEn)
-            resFunc[nv].SetPoint(np,1/ROOT.TMath.Sqrt(meanGenEn),sigmaFit/meanFit)
-            resFunc[nv].SetPointError(np,meanGenEnErr/(2*ROOT.TMath.Power(meanGenEn,1.5)),sigmaFitError/meanFit)
+            nv=len(calibFunc)
+            calibFunc.append(ROOT.TGraphErrors())
+            calibFunc[nv].SetMarkerStyle(20+iyrang) #nv+4*nv%2)
+            calibFunc[nv].SetTitle('%s |#eta|=%3.1f'%(varTitle,yRang[0]))
+            calibFunc[nv].SetFillStyle(0)
+            calibFunc[nv].SetMarkerColor(varCtr+1)
+            calibFunc[nv].SetLineColor(varCtr+1)
+            calibFunc[nv].SetName('calib_%s_%d'%(vName,iyrang))
+            resFunc.append(calibFunc[nv].Clone('resol_%s_%d'%(vName,iyrang)))
+
+            c.Clear()
+            c.Divide(len(pGunPtRanges)/3+1,2)
+            ipad=0
+            for ptRang in pGunPtRanges:
+                ipad=ipad+1
+                postfix='fit%d%d%d'%(ipad,nv,iyrang)
+
+                #cut data
+                redData=ws.data('fitdata').reduce('pt>=%f && pt<=%f && eta>=%f && eta<=%f'%(
+                    ptRang[0]-ptRang[1], ptRang[0]+ptRang[1],
+                    yRang[0]-yRang[1],   yRang[0]+yRang[1]))
+                if redData.numEntries()<10 :
+                    ipad=ipad-1
+                    continue
+                    
+                #generator level information
+                fitDataMean,   fitDataSigma   = redData.mean(ws.var(vName)), redData.sigma(ws.var(vName))
+                fitDataEnMean, fitDataEnSigma = redData.mean(ws.var('en')),     redData.sigma(ws.var('en'))
+
+                #define PDF and ranges to fit/show
+                ws.var(vName).setRange(postfix,fitDataMean-4*fitDataSigma,fitDataMean+4*fitDataSigma)
+                ws.var(vName).setRange('fit'+postfix,fitDataMean-2*fitDataSigma,fitDataMean+2*fitDataSigma)
+                ws.factory('Gaussian::g_%s(%s,mean_%s[%f,%f,%f],sigma_%s[%f,%f,%f])'%
+                           (postfix,vName,
+                            postfix,fitDataMean,fitDataMean-5*fitDataSigma,fitDataMean+5*fitDataSigma,
+                            postfix,fitDataSigma,fitDataSigma/2,fitDataSigma*2)
+                    )
+
+                #fit
+                fres=ws.pdf('g_%s'%postfix).fitTo( redData, ROOT.RooFit.Range('fit'+postfix), ROOT.RooFit.Save(True) )
+                meanFit       = ws.var('mean_%s'%postfix).getVal()
+                meanFitError  = ws.var('mean_%s'%postfix).getError()
+                sigmaFit      = ws.var('sigma_%s'%postfix).getVal()
+                sigmaFitError = ws.var('sigma_%s'%postfix).getError()
+                if meanFit<0:
+                    ipad=ipad-1
+                    continue
+
+                #save results
+                np=calibFunc[nv].GetN()
+                calibFunc[nv].SetPoint(np,fitDataEnMean,meanFit*fitDataEnMean)
+                calibFunc[nv].SetPointError(np,fitDataEnSigma,meanFitError*fitDataEnMean)
+                resFunc[nv].SetPoint(np,1/ROOT.TMath.Sqrt(fitDataEnMean),sigmaFit/meanFit)
+                resFunc[nv].SetPointError(np,fitDataEnSigma/(2*ROOT.TMath.Power(fitDataEnMean,1.5)),sigmaFitError/meanFit)
             
-            #show the result
-            p=c.cd(ipad)
-            frame=ws.var(var).frame(ROOT.RooFit.Range(postfix))
-            redData.plotOn(frame)
-            ws.pdf('g_%s'%postfix).plotOn(frame,ROOT.RooFit.Range(postfix))
-            frame.Draw()
-            frame.GetXaxis().SetNdivisions(5)
-            frame.GetXaxis().SetTitle(varTitle + ' / Energy')
-            #frame.GetYaxis().SetRangeUser(0,1600)
-            frame.GetYaxis().SetTitle('Events')
-            frame.GetYaxis().SetTitleOffset(1.4)
-            pt=MyPaveText('[%d<=Energy/GeV<%d]\\<E>=%3.1f RMS=%3.1f\\#mu=%3.1f #sigma=%3.1f'%(enmin,enmax,redDataMean,redDataSigma,meanFit,sigmaFit),
-                          0.18,0.9,0.5,0.6)
-            pt.SetTextFont(42)
-            pt.SetTextSize(0.06)
-            if ipad==1:
-                pt=MyPaveText('CMS simulation')
-                pt.SetTextSize(0.08)
+                #show the result
+                p=c.cd(ipad)
+                frame=ws.var(vName).frame(ROOT.RooFit.Range(postfix))
+                redData.plotOn(frame)
+                ws.pdf('g_%s'%postfix).plotOn(frame,ROOT.RooFit.Range(postfix))
+                frame.Draw()
+                frame.GetXaxis().SetNdivisions(5)
+                frame.GetXaxis().SetTitle(varTitle + ' / Energy')
+                frame.GetYaxis().SetTitle('Events')
+                frame.GetYaxis().SetTitleOffset(1.4)
+                frame.GetYaxis().SetRangeUser(0,2*frame.GetMaximum())
+                pt=MyPaveText('[E_{beam}=%3.1f GeV, |#eta|=%3.1f]\\<E>=%3.1f RMS=%3.2f\\#mu=%3.1f #sigma=%3.2f'%(fitDataEnMean,yRang[0],fitDataMean,fitDataSigma,meanFit,sigmaFit),
+                              0.18,0.9,0.5,0.6)
+                pt.SetTextFont(42)
+                pt.SetTextSize(0.06)
+                if ipad==1:
+                    pt=MyPaveText('CMS simulation')
+                    pt.SetTextSize(0.08)
 
-    return showEMcalibrationResults(calibFunc=calibFunc,resFunc=resFunc)
+            for ext in ['png','pdf','C'] : c.SaveAs('%s/efits_%s_eta%3.1f.%s'%(outDir,vName,yRang[0],ext))
+            
+            
+    return showEMcalibrationResults(calibFunc=calibFunc,resFunc=resFunc,outDir=outDir)
 
 """
 steer 
@@ -255,65 +403,17 @@ steer
 def main(argv=None):
 
     customROOTstyle()
-    ROOT.gROOT.SetBatch(False)
-
+    #ROOT.gROOT.SetBatch(False)
     ROOT.gStyle.SetOptTitle(0)
     ROOT.gStyle.SetOptStat(0)
 
-    w2Scan=[0.5,0.75,1.0,1.5,2.0,2.5,3.0,3.5]
-    w3Scan=[0.5,0.75,1.0,1.5,2.0,2.5,3.0,3.5]
-    hstoch=ROOT.TH2F('stochscan',';w_{2}/w_{1};w_{3}/w_{1};Value',len(w2Scan),0,len(w2Scan),len(w3Scan),0,len(w3Scan))
-    for xbin in xrange(1,hstoch.GetXaxis().GetNbins()+1): hstoch.GetXaxis().SetBinLabel(xbin,'%3.2f'%w2Scan[xbin-1])
-    for ybin in xrange(1,hstoch.GetYaxis().GetNbins()+1): hstoch.GetYaxis().SetBinLabel(ybin,'%3.2f'%w3Scan[ybin-1])
-    hstoch.SetTitle('(#sigma/E)_{stoch}')
-    hconst=hstoch.Clone('constscan')
-    hconst.SetTitle('(#sigma/E)_{const}')
-    hslope=hstoch.Clone('slopescan')
-    hslope.SetTitle('Calibration slope')
-    hoffset=hstoch.Clone('offsetscan')
-    hoffset.SetTitle('Calibration offset')
-    hstoch.SetDirectory(0)
-    hconst.SetDirectory(0)
-    hslope.SetDirectory(0)
-    hoffset.SetDirectory(0)
-    xbin=0
-    for w2 in w2Scan:
-        xbin=xbin+1
-        ybin=0
-        for w3 in w3Scan:
-            ybin=ybin+1
-            res=runResolutionStudy(vars=[['recEn','#Sigma w_{i}E_{i}']],
-                                   wgt=[1.0,w2,w3],
-                                   mipEn=55.1,
-                                   url='cmssw/SingleElectron_v15.root')
-            hstoch.SetBinContent(xbin,ybin,res[0][0])
-            hstoch.SetBinError(xbin,ybin,res[0][1])
-            hconst.SetBinContent(xbin,ybin,res[0][2])
-            hconst.SetBinError(xbin,ybin,res[0][3])
-            hslope.SetBinContent(xbin,ybin,res[0][4])
-            hslope.SetBinError(xbin,ybin,res[0][5])
-            hoffset.SetBinContent(xbin,ybin,res[0][6])
-            hoffset.SetBinError(xbin,ybin,res[0][7])
+    #genM=0.000511
+    #url='cmssw/SingleElectron_SLHC13_30um_SimHits.root'
 
-    #show results
-    c=ROOT.TCanvas('cscan','cscan',600,600)
-    c.SetRightMargin(0.15)
-    for h in [hstoch,hconst,hslope,hoffset]:
-        c.Clear()
-        h.Draw('colz')
-        h.GetXaxis().SetLabelSize(0.035)
-        h.GetYaxis().SetLabelSize(0.035)
-        h.GetXaxis().SetTitleSize(0.04)
-        h.GetYaxis().SetTitleSize(0.04)
-        MyPaveText('CMS simulation')
-        pt=MyPaveText(h.GetTitle(),0.18,0.9,0.5,0.6)
-        pt.SetTextFont(42)
-        pt.SetTextSize(0.06)
-        c.Modified()
-        c.Update()
-        raw_input()
-        c.SaveAs('%s.png'%h.GetName())
+    genM=0.1396
+    url='cmssw/SinglePion_SLHC13_30um_SimHits.root'
 
+    runResolutionStudy(url=url,genM=genM)
     
 if __name__ == "__main__":
     sys.exit(main())
