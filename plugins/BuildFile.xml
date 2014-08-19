@@ -12,6 +12,16 @@
 <use name="DataFormats/Candidate"/>
 <use name="DataFormats/HepMCCandidate"/>
 <use name="CommonTools/UtilAlgos"/>
+<use name="SimDataFormats/Track"/>
+<use name="SimDataFormats/Vertex"/>
+<use name="DataFormats/TrackReco"/>
+<use name="Geometry/FCalGeometry"/>
+<use name="Geometry/TrackerGeometryBuilder"/>
+<use name="DataFormats/GeometrySurface"/>
+<use name="DataFormats/TrajectorySeed"/>
+<use name="TrackingTools/TrajectoryState"/>
+<use name="TrackingTools/MaterialEffects"/>
+<use name="MagneticField/Engine"/>
 <use name="UserCode/HGCanalysis"/>
 <use name="geant4core"/>
 <use name="root"/>

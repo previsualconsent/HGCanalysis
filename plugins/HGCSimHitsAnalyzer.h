@@ -27,6 +27,23 @@
 
 #include "UserCode/HGCanalysis/interface/HGCSimulationEvent.h"
 
+#include "SimDataFormats/Track/interface/SimTrack.h"
+#include "SimDataFormats/Track/interface/SimTrackContainer.h"
+#include "SimDataFormats/Vertex/interface/SimVertex.h"
+#include "SimDataFormats/Vertex/interface/SimVertexContainer.h"
+
+#include "TrackingTools/TransientTrack/interface/TransientTrackBuilder.h"
+#include "TrackingTools/Records/interface/TransientTrackRecord.h"
+#include "TrackingTools/IPTools/interface/IPTools.h"
+#include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
+#include "DataFormats/TrajectorySeed/interface/PropagationDirection.h"
+#include "TrackingTools/TrajectoryState/interface/TrajectoryStateTransform.h"
+#include "TrackingTools/MaterialEffects/interface/PropagatorWithMaterial.h"
+#include "DataFormats/GeometrySurface/interface/BoundDisk.h"
+#include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
+#include "MagneticField/Engine/interface/MagneticField.h"
+#include "Geometry/FCalGeometry/interface/HGCalGeometry.h"
+
 #include "TH1F.h"
 #include "TTree.h"
 
@@ -48,33 +65,69 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
 
  private:
 
-  bool defineGeometry(edm::ESTransientHandle<DDCompactView> &ddViewH);
+  /**
+     @short loops over genparticles and saves a summary of stable (status=1) particles incoming to the detector
+   */
+  void analyzeGenParticles(edm::Handle<edm::View<reco::Candidate> > &genParticles);
+
+
+  /**
+     @short loops over SimTracks and SimVertices and stores the most relevant information
+     cf. https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideDataFormatSimG4Core
+  */
+  void analyzeG4information(edm::Handle<edm::SimTrackContainer> &SimTk,edm::Handle<edm::SimVertexContainer> &SimVtx);
+
+
+  /** 
+      @short analyzes tracks point to the endcap region and propagates them to the different layers of HGCal
+      cf. https://cmssdt.cern.ch/SDT/lxr/source/RecoEgamma/EgammaPhotonProducers/src/ConversionProducer.cc?v=CMSSW_6_2_0_SLHC10
+   */
+  void analyzeTrackingInformation(edm::Handle<reco::TrackCollection> &tracks, edm::ESHandle<TrackerGeometry> &tkGeom, edm::ESHandle<MagneticField> &bField,std::map<int,const HGCalGeometry *> &hgcGeometries);
   
-  void analyzeHits(size_t isd, edm::Handle<edm::PCaloHitContainer> &caloHits, edm::Handle<edm::View<reco::Candidate> > &gen);
+  /**
+     @short accumulate sim hits
+   */
+  void analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContainer> &caloHits,const HGCalGeometry *geom);
+
+  /**
+     @short save digis
+   */
   void analyzeHEDigis(size_t isd,edm::Handle<HGCHEDigiCollection> &heDigis);
   void analyzeEEDigis(size_t isd,edm::Handle<HGCEEDigiCollection> &eeDigis);
 
+  /**
+     @short reset accumulators
+   */
   inline void resetAccumulator()
-  {
-    for(size_t isd=0; isd<simHitData_.size(); isd++)
-      for( HGCSimHitDataAccumulator::iterator it = simHitData_[isd].begin(); it!=simHitData_[isd].end(); it++)
-	std::fill(it->second.begin(), it->second.end(),0.);
-  }
-  
-  std::string ddViewName_;
-  bool geometryDefined_;
-  std::vector<std::string> hitCollections_, digiCollections_;
-  std::vector<std::string> sdTags_;
-  std::string genSource_;
-  bool addGlobalPos_;
+    {
+      for(size_t isd=0; isd<simHitData_.size(); isd++)
+	for( HGCSimHitDataAccumulator::iterator it = simHitData_[isd].begin(); it!=simHitData_[isd].end(); it++)
+	  std::fill(it->second.begin(), it->second.end(),0.);
+    }
 
-  std::vector<HGCNumberingScheme *> numberingSchemes_;
-
+  //tree and summary ntuple
   TTree *t_;
   HGCSimEvent_t simEvt_;
-  std::vector<HGCSimHitDataAccumulator> simHitData_;
+  
+  //gen level
+  bool saveGenParticles_;
+  std::string genSource_;
+  
+  //geant4
+  bool saveG4_;
+  std::string g4TracksSource_,g4VerticesSource_;
 
-  edm::Service<TFileService> *fs_;
+  //tracking
+  bool saveTkExtrapol_;
+  std::string trackSource_;
+  PropagatorWithMaterial *piTkPropagator_;
+  std::map<int, std::vector<ReferenceCountingPointer<BoundDisk> > > plusSurface_, minusSurface_;
+
+  //hgcal
+  std::vector<std::string> geometrySource_;
+  std::vector<std::string> hitCollections_;
+  std::vector<std::string> digiCollections_;
+  std::vector<HGCSimHitDataAccumulator> simHitData_;
 };
  
 
