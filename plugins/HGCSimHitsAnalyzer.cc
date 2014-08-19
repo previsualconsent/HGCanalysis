@@ -45,7 +45,7 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) :
   g4VerticesSource_ = iConfig.getUntrackedParameter<std::string>("g4VerticesSource");
   saveTkExtrapol_   = iConfig.getUntrackedParameter< bool > ("saveTkExtrapol");
   trackSource_      = iConfig.getUntrackedParameter<std::string>("trackSource");
-  geometrySource_   = iConfig.getParameter< std::vector<std::string> >("geometrySource");
+  geometrySource_   = iConfig.getUntrackedParameter< std::vector<std::string> >("geometrySource");
   hitCollections_   = iConfig.getUntrackedParameter< std::vector<std::string> >("hitCollections");
   digiCollections_  = iConfig.getUntrackedParameter< std::vector<std::string> >("digiCollections");
 

@@ -43,14 +43,7 @@ process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
 print process.source.fileNames
 
-process.hgcSimHitsAnalyzer = cms.EDAnalyzer("HGCSimHitsAnalyzer",
-                                            ddViewName      = cms.untracked.string(""),
-                                            hitCollections  = cms.untracked.vstring('HGCHitsEE',       'HGCHitsHEfront',           'HGCHitsHEback'               ),
-                                            digiCollections = cms.untracked.vstring('HGCDigisEE',      'HGCDigisHEfront',          'HGCDigisHEback'              ),
-                                            sdTags          = cms.untracked.vstring('HGCalEESensitive','HGCalHESiliconSensitive',  'HGCalHEScintillatorSensitive'),
-                                            genSource       = cms.untracked.string("genParticles"),
-                                            addGlobalPos    = cms.untracked.bool(True)
-                                            )
+process.load('UserCode.HGCanalysis.hgcSimHitsAnalyzer_cfi.py')
 
 process.p = cms.Path(process.hgcSimHitsAnalyzer)
 
