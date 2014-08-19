@@ -16,33 +16,23 @@ from ROOT import *
 """
 loops over the events and collects the electron energies
 """
-def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,noiseScale=0.0,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
+def runOccupancyAnalysis(accMap,fInUrl,tag,avgPU=0,sdType=0,mipEn=54.8,treeName='hgcSimHitsAnalyzer/HGC') :
 
-    noiseSigma={0:0.075*noiseScale,
-                1:0.3  *noiseScale,
-                2:0.675*noiseScale,
-                3:1.2  *noiseScale}
-    if sdType==1 :
-        noiseSigma[0]=noiseSigma[1]
-        noiseSigma[1]=noiseSigma[2]
-        noiseSigma[2]=noiseSigma[3]
-        noiseSigma[3]=16*noiseSigma[0]
-        
-    
     dataVolumePerLayer={}
 
     #prepare output
-    foutUrl=os.path.basename(url)
-    foutUrl=foutUrl.replace('.root','_occ_pu%d_sd%d.root'%(avgPU,sdType))
+    foutUrl='%s_occ_pu%d_sd%d.root'%(tag,avgPU,sdType)
     fout=TFile.Open(foutUrl,'RECREATE')
     outTuple = ROOT.TNtuple("occ","occ","event:layer:cell:area:eta:e_sr0:e_sr1:e_sr2")
                             
     #analyze generated minimum bias events
-    fin=TFile.Open(url)
-    Events=fin.Get(treeName)
+    Events=ROOT.TChain(treeName)
+    for f in fInUrl:
+        Events.Add(f)
+    print 'Found %d events in %d files'%(Events.GetEntries(),len(fInUrl))
     
     #generate pileup sets
-    evRanges=generateInTimePUSets(Events.GetEntriesFast(),avgPU)
+    evRanges=generateInTimePUSets(Events.GetEntries(),avgPU)
 
     #useful to integrate over different cells
     cellInteg=CellIntegrator()
@@ -50,7 +40,7 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
     #iterate over events
     iSetCtr=0
     for iSet in evRanges:
-        
+        if iSetCtr>1: break
         iSetCtr=iSetCtr+1
         sys.stdout.write( '\r Status [%d/%d]'%(iSetCtr,len(evRanges)) )
         sys.stdout.flush()
@@ -72,6 +62,9 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
                 layer=Events.hit_layer[idep]
                 sector=Events.hit_sec[idep]
 
+                if layer%3==0: continue
+                layer=layer/3
+
                 #add
                 edep=Events.hit_edep[idep]*1e6 #/mipEn
                 bin=Events.hit_bin[idep]
@@ -84,27 +77,6 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
 
         #check what has been accumulated
         for layer in accMap:
-
-            #accMap[layer].accumulator[0].Draw('colz')
-            #raw_input()
-
-            #data volume estimate
-            #for each cell compute the number of bits to send and integrate for a sector or specific eta's
-            #if not (layer in dataVolumePerLayer):
-            #    dataVolumePerLayer[layer]={}
-            #    for reg in [0,1,2,3]:
-            #       dataVolumePerLayer[layer][reg]=ROOT.TH1F('datavol_layer%d_reg_%d'%(layer,reg),';Data volume/bunch crossing (kb);Events x 20^{o} sector;',200,0,2)
-            #        dataVolumePerLayer[layer][reg].SetDirectory(0)
-            #for sector in accMap[layer].accumulator:
-            #    totalBits={0:0,1:0,2:0,3:0}
-            #    for ybin in xrange(1,accMap[layer].accumulator[sector].GetYaxis().GetNbins()+1):
-            #        for xbin in xrange(1,accMap[layer].accumulator[sector].GetXaxis().GetNbins()+1):
-            #            bitsToSend,ireg=dataBitsToSend( accMap[layer].etaMap[sector].GetBinContent(xbin,ybin), accMap[layer].accumulator[sector].GetBinContent(xbin,ybin) )
-            #            if ireg==0 : continue
-            #            totalBits[ireg]=totalBits[ireg]+bitsToSend
-            #            totalBits[0]=totalBits[0]+bitsToSend
-            #    for ireg in totalBits:
-            #        dataVolumePerLayer[layer][ireg].Fill(float(totalBits[ireg])/1024.)
 
             #occupancy estimate
             #integrate up to 3x3 cells with increasing size (multiple of the base bin width)
@@ -145,9 +117,6 @@ def runOccupancyAnalysis(accMap,url='HGCSimHitsAnalysis.root',avgPU=0,sdType=0,n
                                 totalInCell[srNumber] = totalInCell[srNumber] + accMap[layer].accumulator[sector].GetBinContent(centerXbin+iXbin,centerYbin+iYbin)
                                 etaInCell[srNumber]   = etaInCell[srNumber]   + accMap[layer].etaMap[sector].GetBinContent(centerXbin+iXbin,centerYbin+iYbin)
 
-                        #no noise for the moment
-                        # noise=ROOT.gRandom.Gaus(0,noiseSigma[cell])
-
                         #fill ntuple
                         varsToFill=[iSetCtr,layer,cell,TMath.Power(cell*binWidth,2),etaInCell[0]/nCellsInteg[0],totalInCell[0],totalInCell[1],totalInCell[2]]
                         outTuple.Fill(array("f",varsToFill))                        
@@ -176,11 +145,10 @@ def main():
 
     usage = 'usage: %prog [options]'
     parser = optparse.OptionParser(usage)
-    parser.add_option('-i', '--in'         ,    dest='input'              , help='Input file',                          default=None           )
+    parser.add_option('-i', '--in'         ,    dest='input'              , help='Input directory',                     default=None           )
+    parser.add_option('-t', '--tag'        ,    dest='tag'                , help='Simulation tag',                      default="", )
     parser.add_option('-p', '--pu'         ,    dest='pu'                 , help='Average PU to overlay',               default=0,    type=int )
-    parser.add_option('-s', '--sd'         ,    dest='sd'                 , help='Sensitive detector to analyse',       default=0,    type=int )
-    parser.add_option('-c', '--cell'       ,    dest='cell'               , help='cell size [mm]',                      default=10,   type=int )
-    parser.add_option('-n', '--noise'      ,    dest='noiseScale'         , help='noise scale factor',                   default=0,   type=float )
+    parser.add_option('-s', '--sd'         ,    dest='sd'                 , help='Sensitive detector to analyse',       default=0,    type=int )    
     (opt, args) = parser.parse_args()
 
     if opt.input is None :
@@ -192,9 +160,20 @@ def main():
     #gROOT.SetBatch(True)
     gROOT.SetBatch(False)
     gStyle.SetPalette(55)
+
+    #filter input files
+    lsOutput = commands.getstatusoutput('cmsLs %s | grep root | awk \'{print $5}\''%(opt.input))[1].split()
+    fInUrl=[]
+    for f in lsOutput:
+        if f.find(opt.tag)<0 : continue
+        fInUrl.append( commands.getstatusoutput('cmsPfn '+f)[1] )
+    if len(fInUrl)==0:
+        print 'No files matching %s in %s have been found'%(opt.tag,opt.input)
+        parser.print_help()
+        sys.exit(1)
     
-    accMap=readSectorHistogramsFrom(fInUrl=opt.input,sd=opt.sd)
-    runOccupancyAnalysis(accMap,url=opt.input,avgPU=opt.pu,sdType=opt.sd,noiseScale=opt.noiseScale)
+    accMap=readSectorHistogramsFrom(fInUrl=fInUrl[0],sd=opt.sd)
+    runOccupancyAnalysis(accMap,fInUrl=fInUrl,tag=opt.tag,avgPU=opt.pu,sdType=opt.sd)
 
 if __name__ == "__main__":
     main()

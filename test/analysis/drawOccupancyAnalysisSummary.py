@@ -58,9 +58,9 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
     #base canvas
     c=TCanvas('c','c',500,500)
     
-    #cells=[1]
+    cells=[2]
     #thresholds=[0.4]
-    cells=[1,2,3]
+    #cells=[1,2,3]
     thresholds=[0.4,1.0,5.0,10.,25.0]
     etaBins=[[1,3],[4,5],[6,7],[8,9],[10,11],[12,13]]#,[14,14],[15,15]]
 
@@ -142,27 +142,38 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
     #iterate over layers
     for layer in layers:
 
-        sys.stdout.write( '\r Layer [%d/%d]'%(layer,len(layers)) )
+        if layer%3==2 or layer%3==0 : continue
+
+        sys.stdout.write( '\r Layer [%d/%d]'%(layer/3+1,len(layers)/3) )
         sys.stdout.flush()
 
         for cell in cells:
 
             #create an entry list with these cuts
-            finalCut='layer==%d && cell==%d'%(layer,cell)
+            finalCut='(layer==%d || layer==%d) && cell==%d'%(layer,layer+1,cell)
             if len(addCut) : finalCut=finalCut + ' && ' + addCut            
             occT.Draw('>>elist', finalCut,'entrylist')
+            
             elist = ROOT.gDirectory.Get("elist")
 
             #fill the base histograms 
             dataVolH.Reset('ICE')
             eprofH.Reset('ICE')
+            edeps={}
             for ientry in xrange(0,elist.GetN()):
                 tentry=elist.GetEntry(ientry) 
                 occT.GetEntry( tentry )
+
                 corrEn=(occT.e_sr0/mip)*TMath.TanH(occT.eta)
-                if noiseLevel>0 : corrEn = corrEn + gRandom.Gaus(0,noiseLevel)
-                dataVolH.Fill(TMath.Abs(occT.eta),getReadoutBits(corrEn,occT.eta))
-                eprofH.Fill(TMath.Abs(occT.eta),corrEn)
+                if occ.layer%3==1: edeps[occT.eta]=corrEn
+                else : edeps[occT.eta]=corrEn
+            for eta in edeps:
+                corrEn=edeps[eta]
+                if noiseLevel>0 :
+                    corrEn = corrEn + gRandom.Gaus(0,noiseLevel)
+                    if corrEn<0: corrEn=0
+                dataVolH.Fill(TMath.Abs(eta),getReadoutBits(corrEn,eta))
+                eprofH.Fill(TMath.Abs(eta),corrEn)
 
             #project in eta slices
             eprofGr.Set(0)
@@ -197,7 +208,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 eH.Fit(mipPeakFinderFunc,'QLR0+','',0.4,1.6)
                 uncalibMIP,uncalibMIPerr=mipPeakFinderFunc.GetParameter(1),mipPeakFinderFunc.GetParError(1)
                 np=uncalibMIPprofiles[cell][iEtaBin].GetN()
-                uncalibMIPprofiles[cell][iEtaBin].SetPoint(np,layer,uncalibMIP)
+                uncalibMIPprofiles[cell][iEtaBin].SetPoint(np,layer/3+1,uncalibMIP)
                 uncalibMIPprofiles[cell][iEtaBin].SetPointError(np,0,uncalibMIPerr)
                 
                 #compute occupancies
@@ -206,7 +217,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                     cellOccErr=ROOT.Double(0)
                     cellOcc=eH.IntegralAndError(ybin,eH.GetXaxis().GetNbins(),cellOccErr)
                     np=occProfiles[thr][cell][iEtaBin].GetN()
-                    occProfiles[thr][cell][iEtaBin].SetPoint(np,layer,cellOcc*100/totalHits)
+                    occProfiles[thr][cell][iEtaBin].SetPoint(np,layer/3+1,cellOcc*100/totalHits)
                     occProfiles[thr][cell][iEtaBin].SetPointError(np,0,cellOccErr*100/totalHits)
                     
                 #data volume
@@ -219,7 +230,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 dataprofGr.SetPoint(np,ieta,meanData)
                 dataprofGr.SetPointError(np,0.5*deta,meanDataErr)
                 np=dataVolProfiles[cell][iEtaBin].GetN()
-                dataVolProfiles[cell][iEtaBin].SetPoint(np,layer,meanData)
+                dataVolProfiles[cell][iEtaBin].SetPoint(np,layer/3+1,meanData)
                 dataVolProfiles[cell][iEtaBin].SetPointError(np,0,dvH.GetMeanError())
 
                 #all done here
@@ -234,7 +245,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 profilesToSave[prof][0].Draw('colz')
                 profilesToSave[prof][1].Draw('p')
                 MyPaveText(caption)
-                ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer,baseArea*cell),0.12,0.9,0.9,0.93)
+                ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer/3+1,baseArea*cell),0.12,0.9,0.9,0.93)
                 ptxt.SetTextSize(0.035)
                 ptxt.SetFillColor(0)
                 ptxt.SetFillStyle(3001)
@@ -243,8 +254,8 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 c.SetLogy(False)
                 c.Modified()
                 c.Update()
-                c.SaveAs('%s/%s_layer%d_cell%d%s.png'%(output,prof,layer,cell,pfix))
-                c.SaveAs('%s/%s_layer%d_cell%d%s.C'%(output,prof,layer,cell,pfix))
+                c.SaveAs('%s/%s_layer%d_cell%d%s.png'%(output,prof,layer/3+1,cell,pfix))
+                c.SaveAs('%s/%s_layer%d_cell%d%s.C'%(output,prof,layer/3+1,cell,pfix))
 
             #distributions at a given #eta
             slicesToSave={'eprof1D':[eDistsH,[0.4,3]],
@@ -272,7 +283,7 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                     leg.AddEntry(slicesToSave[dist][0][ih],slicesToSave[dist][0][ih].GetTitle(),'l')
                 leg.Draw()
                 MyPaveText(caption)
-                ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer,baseArea*cell),0.12,0.9,0.9,0.93)
+                ptxt=MyPaveText('#bf{[Layer #%d]} cell area=%3.1f mm^{2}'%(layer/3+1,baseArea*cell),0.12,0.9,0.9,0.93)
                 ptxt.SetTextSize(0.035)
                 ptxt.SetFillColor(0)
                 ptxt.SetFillStyle(3001)
@@ -304,8 +315,8 @@ def drawOccupancyAnalysisSummary(input,output,mip,addCut='',noiseLevel=0,pfix=''
                 c.SetLogy()
                 c.Modified()
                 c.Update()
-                c.SaveAs('%s/%s_layer%d_cell%d%s.png'%(output,dist,layer,cell,pfix))
-                c.SaveAs('%s/%s_layer%d_cell%d%s.C'%(output,dist,layer,cell,pfix))
+                c.SaveAs('%s/%s_layer%d_cell%d%s.png'%(output,dist,layer/3+1,cell,pfix))
+                c.SaveAs('%s/%s_layer%d_cell%d%s.C'%(output,dist,layer/3+1,cell,pfix))
 
     #occupancy summaries
     for thr in occProfiles:
@@ -417,7 +428,7 @@ def main():
     #adding noise
     drawOccupancyAnalysisSummary(input=opt.input,output=opt.output,mip=opt.mip,
                                  #http://en.wikipedia.org/wiki/Box-Muller_transform
-                                 noiseLevel=0.2,
+                                 noiseLevel=1./5.,
                                  pfix='_noise',
                                  caption=opt.caption)
             

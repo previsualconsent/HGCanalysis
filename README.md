@@ -30,14 +30,21 @@ python test/analysis//testSimHits.py -i /store/cmst3/group/hgcal/CMSSW/Ntuples -
 python test/analysis//testSimHits.py -i /store/cmst3/group/hgcal/CMSSW/Ntuples -t SinglePion_SLHC13_30um_SimHits
 
 #occupancy studies
-pileup=(100 140 200)
-cell=(5 10 25)
+pileup=(140 200)
+noise=(0) # it is generated in the summary
 sdType=(0 1)
 for p in ${pileup[@]}; do
-   for c in ${cell[@]}; do
-	for s in ${sdType[@]}; do
-	   python test/analysis/runOccupancyAnalysis.py -i /data/psilva/MinBias_SimHits.root -c ${c} -p ${p} -s ${s} & 
-	done
-   done
+for n in ${noise[@]}; do 
+for s in ${sdType[@]}; do
+python test/analysis/runOccupancyAnalysis.py -i /store/cmst3/group/hgcal/CMSSW/Ntuples/ -t MinBias_v16 -p ${p} -s ${s} -n ${n} &
+done
+done
 done
 
+for p in ${pileup[@]}; do
+for n in ${noise[@]}; do
+for s in ${sdType[@]}; do
+python test/analysis/drawOccupancyAnalysisSummary.py -i MinBias_v16_occ_pu${p}_sd${s}.root -o pu${p}_sd${s} &
+done
+done
+done

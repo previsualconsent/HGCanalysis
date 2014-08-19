@@ -47,38 +47,23 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) : geo
   t_->Branch("run",       &simEvt_.run,        "run/I");
   t_->Branch("lumi",      &simEvt_.lumi,       "lumi/I");
   t_->Branch("event",     &simEvt_.event,      "event/I");
-
   t_->Branch("ngen",      &simEvt_.ngen,       "ngen/I");
   t_->Branch("gen_id",     simEvt_.gen_id,     "gen_id[ngen]/I");
   t_->Branch("gen_pt",     simEvt_.gen_pt,     "gen_pt[ngen]/F");
   t_->Branch("gen_eta",    simEvt_.gen_eta,    "gen_eta[ngen]/F");
   t_->Branch("gen_phi",    simEvt_.gen_phi,    "gen_phi[ngen]/F");
   t_->Branch("gen_en",     simEvt_.gen_en,     "gen_en[ngen]/F"); 
-
   t_->Branch("nhits",     &simEvt_.nhits,      "nhits/I");
   t_->Branch("hit_type",   simEvt_.hit_type,   "hit_type[nhits]/I");
   t_->Branch("hit_layer",  simEvt_.hit_layer,  "hit_layer[nhits]/I");
-  t_->Branch("hit_sec",    simEvt_.hit_sec,    "hit_sec[nhits]/I");
-  t_->Branch("hit_bin",    simEvt_.hit_bin,    "hit_bin[nhits]/I");
   t_->Branch("hit_edep",   simEvt_.hit_edep,   "hit_edep[nhits]/F");
   t_->Branch("hit_avgt",   simEvt_.hit_avgt,   "hit_avgt[nhits]/F");
-
-  if(addGlobalPos_)
-    {
-      t_->Branch("hit_x",   simEvt_.hit_x,   "hit_x[nhits]/F");
-      t_->Branch("hit_y",   simEvt_.hit_y,   "hit_y[nhits]/F");
-      t_->Branch("hit_z",   simEvt_.hit_z,   "hit_z[nhits]/F");
-      t_->Branch("hit_eta",   simEvt_.hit_eta,   "hit_eta[nhits]/F");
-      t_->Branch("hit_phi",   simEvt_.hit_phi,   "hit_phi[nhits]/F");
-    }
-
-
-  t_->Branch("ndigis",    &simEvt_.ndigis,     "ndigis/I");
-  t_->Branch("digi_type",  simEvt_.digi_type,  "digi_type[ndigis]/I");
-  t_->Branch("digi_layer", simEvt_.digi_layer, "digi_layer[ndigis]/I");
-  t_->Branch("digi_sec",   simEvt_.digi_sec,   "digi_sec[ndigis]/I");
-  t_->Branch("digi_bin",   simEvt_.digi_bin,   "digi_bin[ndigis]/I");
-  t_->Branch("digi_adc",   simEvt_.digi_adc,   "digi_adc[ndigis]/F");
+  t_->Branch("hit_x",      simEvt_.hit_x,      "hit_x[nhits]/F");
+  t_->Branch("hit_y",      simEvt_.hit_y,      "hit_y[nhits]/F");
+  t_->Branch("hit_z",      simEvt_.hit_z,      "hit_z[nhits]/F");
+  t_->Branch("hit_eta",    simEvt_.hit_eta,    "hit_eta[nhits]/F");
+  t_->Branch("hit_phi",    simEvt_.hit_phi,    "hit_phi[nhits]/F");
+  t_->Branch("digi_adc",   simEvt_.digi_adc,   "digi_adc[nhits]/s");
 }
 
 //
@@ -132,7 +117,6 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
   
   //hits, digis
   simEvt_.nhits=0;
-  simEvt_.ndigis=0;
   for(size_t i=0; i<hitCollections_.size(); i++)
     {
       edm::Handle<edm::PCaloHitContainer> caloHits;
@@ -154,65 +138,51 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
     }
 
   //dump accumulators to tree and reset
-  for(std::map< std::pair<int,int>, std::vector<HGCSectorAccumulator> >::iterator it=allSectors_.begin(); it!=allSectors_.end(); it++)
+  for(size_t isd=0; isd<simHitData_.size(); isd++)
     {
-      for(size_t isec=0; isec<it->second.size(); isec++)
-	{
-	  TH2F *accH=(it->second)[isec].getAccumulator();
-	  if(accH==0) continue;
-	  TH2F *tH  =(it->second)[isec].getTimer();
-	  for(int xbin=1; xbin<=accH->GetXaxis()->GetNbins(); xbin++)
-	    {
-	      for(int ybin=1; ybin<=accH->GetYaxis()->GetNbins(); ybin++)
-		{
-		  float edep=accH->GetBinContent(xbin,ybin);
-		  if(edep<=0) continue;
-		  if(simEvt_.nhits>=MAXHGCHITSPEREVENT) break;
-		  simEvt_.hit_type [simEvt_.nhits]=it->first.first;
-		  simEvt_.hit_layer[simEvt_.nhits]=it->first.second;
-		  simEvt_.hit_sec  [simEvt_.nhits]=isec;
-		  simEvt_.hit_bin  [simEvt_.nhits]=accH->GetBin(xbin,ybin);
-		  simEvt_.hit_edep [simEvt_.nhits]=edep;
-		  simEvt_.hit_avgt [simEvt_.nhits]=edep > 0. ? tH->GetBinContent(xbin,ybin)/edep : 0.;
-		  if(addGlobalPos_)
-		    {
-		      TVector3 pos=(it->second)[isec].getGlobalPointAt( simEvt_.hit_bin  [simEvt_.nhits] );
-		      simEvt_.hit_x[simEvt_.nhits]=pos.X();
-		      simEvt_.hit_y[simEvt_.nhits]=pos.Y();
-		      simEvt_.hit_z[simEvt_.nhits]=pos.Z();
-		      float rho=TMath::Sqrt(x*x+y*y+z*z);
-		      float phi=TMath::ATan2(y,x);
-		      float eta=0;
-		      if (rho>z) eta=0.5*TMath::Log( (rho+z)/(rho-z) );
-		      else std::cout << "HGCSimHitsAnalyser hit @ " << it->first.second << " sector#" << isec << " has rho=" <<rho << " and z=" << z << "?" << endl;
-		      simEvt_.hit_eta[simEvt_.nhits]=eta;
-		      simEvt_.hit_phi[simEvt_.nhits]=phi;
-		    }
-		  simEvt_.nhits++;
-		}
-	    }  	    
-	  accH->Reset("ICE");
-	  tH->Reset("ICE");
+      //geometry information for this sub-detector
+      const HGCalDDDConstants *dddConst=numberingSchemes_[isd]->getDDDConstants();
 
-	  /*
-	  TH2F *adcH=(it->second)[isec].getDigis();
-	  for(int xbin=1; xbin<=adcH->GetXaxis()->GetNbins(); xbin++)
-	    {
-	      for(int ybin=1; ybin<=adcH->GetYaxis()->GetNbins(); ybin++)
-		{
-		  float adc=adcH->GetBinContent(xbin,ybin);
-		  if(adc<=0) continue;
-		  if(simEvt_.ndigis>=MAXHGCHITSPEREVENT) break;
-		  simEvt_.digi_type [simEvt_.ndigis]=it->first.first;
-		  simEvt_.digi_layer[simEvt_.ndigis]=it->first.second;
-		  simEvt_.digi_sec  [simEvt_.ndigis]=isec;
-		  simEvt_.digi_bin  [simEvt_.ndigis]=adcH->GetBin(xbin,ybin);
-		  simEvt_.digi_adc  [simEvt_.ndigis]=adc;
-		  simEvt_.ndigis++;
-		}
-	    }  	    
-	  adcH->Reset("ICE");
-	  */
+      for(HGCSimHitDataAccumulator::iterator dit=simHitData_[isd].begin(); dit!=simHitData_[isd].end(); dit++)
+	{
+	  uint32_t rawDetId = dit->first;
+	  uint32_t layer    = (rawDetId>>19) & 0x1F;
+	  uint32_t cell     =  rawDetId      & 0xFFF;
+	  uint32_t subsec   = (rawDetId>>18) & 0x1;
+
+	  Float_t edep=dit->second[0];
+	  Float_t avgt=dit->second[1];
+	  if(edep>0) avgt/=edep;
+	  UShort_t adc=(UShort_t)dit->second[2];
+	  
+	  if(edep<=0) continue;
+	  if(simEvt_.nhits>=MAXHGCHITSPEREVENT) break;
+	  simEvt_.hit_type [simEvt_.nhits]=isd;
+	  simEvt_.hit_layer[simEvt_.nhits]=layer;
+	  simEvt_.hit_edep [simEvt_.nhits]=edep;
+	  simEvt_.hit_avgt [simEvt_.nhits]=avgt;
+	  simEvt_.digi_adc [simEvt_.nhits]=adc;
+
+	  //get center and rotation for this layer
+	  std::vector<HGCalDDDConstants::hgtrform>::const_iterator hgtrformIt=dddConst->getFirstTrForm(true);
+	  std::advance(hgtrformIt,layer-1);
+	  CLHEP::Hep3Vector  h3v=hgtrformIt->h3v;
+	  CLHEP::HepRotation hr=hgtrformIt->hr;
+
+
+	  std::pair<float,float> localxy=dddConst->locateCell(cell,layer,subsec,true);
+	  simEvt_.hit_x[simEvt_.nhits]=localxy.first;
+	  simEvt_.hit_y[simEvt_.nhits]=localxy.second;
+	  simEvt_.hit_z[simEvt_.nhits]=0;
+	  //float rho=0;//TMath::Sqrt(TMath::power(x*x+y*y+z*z);
+	  float phi=0;//TMath::ATan2(y,x);
+	  float eta=0;
+	  //if (rho>z) eta=0.5*TMath::Log( (rho+z)/(rho-z) );
+	  //else std::cout << "HGCSimHitsAnalyser hit @ " << it->first.second << " sector#" << isec << " has rho=" <<rho << " and z=" << z << "?" << endl;
+	  simEvt_.hit_eta[simEvt_.nhits]=eta;
+	  simEvt_.hit_phi[simEvt_.nhits]=phi;
+	
+	  simEvt_.nhits++;
 	}
     }
  
@@ -230,85 +200,11 @@ bool HGCSimHitsAnalyzer::defineGeometry(edm::ESTransientHandle<DDCompactView> &d
 
   //instantiate the relevant numbering schemes  
   const DDCompactView &cview=*ddViewH;
+  HGCSimHitDataAccumulator accumulatorBase;
   for(size_t isd=0; isd<sdTags_.size(); isd++)
     {
       numberingSchemes_.push_back( new HGCNumberingScheme(cview,sdTags_[isd]) );
-
-      //instantiate energy accumulators for the different layers  
-      for(std::vector<HGCalDDDConstants::hgtrap>::const_iterator modIt = numberingSchemes_[isd]->getDDDConstants()->getFirstModule();
-	  modIt != numberingSchemes_[isd]->getDDDConstants()->getLastModule();
-	  modIt++)
-	{
-	  int simLayer( modIt->lay );
-	  bool halfSector( sdTags_[isd].find("HEback")!=std::string::npos );
-	  int recoLayer ( numberingSchemes_[isd]->getDDDConstants()->simToReco(1, simLayer, halfSector ).second );
-	  
-	  bool hasRecoLayer(true);
-	  std::vector<HGCalDDDConstants::hgtrap>::const_iterator recModIt = numberingSchemes_[isd]->getDDDConstants()->getFirstModule(true);
-	  if(recoLayer>0) 
-	    {
-	      for(int ilayer=1; ilayer<recoLayer; ilayer++) recModIt++;
-	      if(recoLayer!=recModIt->lay)
-		{
-		  std::cout << "Inconsistency found in sim layer #" << simLayer << " reco layer #" << recModIt->lay << std::endl;
-		  continue;
-		}
-	    }
-	  else hasRecoLayer=false;
-	  
-	  //get the previous transformation if this sim layer is to be ignored
-	  int transformLayer(recoLayer);
-	  if(!hasRecoLayer) transformLayer=numberingSchemes_[isd]->getDDDConstants()->simToReco(1, simLayer-1, halfSector ).second; 
-	  
-	  //get all the sectors at +/-z for this layer
-	  for(std::vector<HGCalDDDConstants::hgtrform>::const_iterator trformIt=numberingSchemes_[isd]->getDDDConstants()->getFirstTrForm();
-	      trformIt!=numberingSchemes_[isd]->getDDDConstants()->getLastTrForm();
-	      trformIt++)
-	    {
-	      if(transformLayer!=trformIt->lay) continue;
-	
-	      //assign -1 if on the negative z
-	      int layerKey = simLayer*trformIt->zp;
-
-	      //initiate new layer if needed
-	      std::pair<int,int> sectorKey(isd,layerKey);
-	      if(allSectors_.find(sectorKey)==allSectors_.end())
-		{
-		  std::vector<HGCSectorAccumulator> layerSectors;
-		  allSectors_[sectorKey]=layerSectors;
-		}
-
-	      //initiate up to a new sector if needed
-	      int sector=trformIt->sec;
-	      if((int)allSectors_[sectorKey].size()<sector)
-		{
-		  for(int isec=(int)allSectors_[sectorKey].size(); isec<sector; isec++)
-		    allSectors_[sectorKey].push_back( HGCSectorAccumulator(isd,layerKey,isec) );
-		}
-
-	      //configure this specific sector
-	      int isec=sector-1;
-	      double simCellSize(modIt->cellSize);         //Geant4 is in mm 
-	      double recoCellSize(hasRecoLayer ? recModIt->cellSize*10 : -1);  //it comes in cm (CMS default)
-	      allSectors_[sectorKey][isec].setGeometry(modIt->h, modIt->bl, modIt->tl, simCellSize,recoCellSize);
-
-	      //seems ok
-	      const CLHEP::Hep3Vector transl ( trformIt->h3v );
-	      const CLHEP::HepRotation hr(trformIt->hr);
-	      const HepGeom::Transform3D local2globalTr( hr, transl );
-
-	      allSectors_[sectorKey][isec].setLocal2GlobalTransformation(local2globalTr);
-	      allSectors_[sectorKey][isec].configure(*fs_);    
-	    }
-	}
-    
-      for(std::map< std::pair<int,int>, std::vector<HGCSectorAccumulator> >::iterator it = allSectors_.begin();
-	  it!=allSectors_.end();
-	  it++)
-	{
-	  std::cout << it->second.size() << "sectors added for sd=" << it->first.first << " @ layer=" << it->first.second << std::endl;
-	  // " with sim cell size=" << simCellSize << " and reco cell size= " << recoCellSize <<std::endl;
-	}
+      simHitData_.push_back( accumulatorBase );
     }
     
   
@@ -325,33 +221,23 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
   //analyze hits
   for(edm::PCaloHitContainer::const_iterator hit_it = caloHits->begin(); hit_it != caloHits->end(); ++hit_it) 
     {
-      HGCalDetId detId(hit_it->id());
-
-      int layer=detId.layer();
-      int zpos=detId.zside();
-      int layerKey(layer);
-      if(zpos<0) layerKey *= -1;
-      std::pair<int,int> sectorKey(isd,layerKey);
-      int sector=detId.sector();
-      //int subSector=detId.subsector();
+      HGCalDetId simId(hit_it->id());
+      uint32_t mySubDet(ForwardSubdetector::HGCEE);
+      if(isd==1) mySubDet=ForwardSubdetector::HGCHEF;
+      if(isd==2) mySubDet=ForwardSubdetector::HGCHEB;
+      uint32_t id = (isd==0) ?
+        (uint32_t)HGCEEDetId(ForwardSubdetector(mySubDet),simId.zside(),simId.layer(),simId.sector(),simId.subsector(),simId.cell()):
+        (uint32_t)HGCHEDetId(ForwardSubdetector(mySubDet),simId.zside(),simId.layer(),simId.sector(),simId.subsector(),simId.cell());
       
-      if(allSectors_.find(sectorKey)==allSectors_.end()){
-	//std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
-	continue;
-      }
-      else if(allSectors_[sectorKey].size()<size_t(sector))
-	{
-	  //std::cout << "[HGCSimHitsAnalyzer][analyzeHits] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
-	  continue;
-	}
-
-      //get local coordinates
-      std::pair<float,float> xy = numberingSchemes_[isd]->getDDDConstants()->locateCell(detId.cell(),detId.layer(),detId.subsector(),false);
-      float localX(xy.first), localY(xy.second);
-
-      //accumulate energy
-      //      int fbin=
-      allSectors_[sectorKey][sector-1].acquire(hit_it->energy(),hit_it->time(),localX,localY);
+      HGCSimHitDataAccumulator::iterator simHitIt=simHitData_[isd].find(id);
+      if(simHitIt==simHitData_[isd].end())
+        {
+          HGCSimHitData baseData(3,0);
+          simHitData_[isd][id]=baseData;
+          simHitIt=simHitData_[isd].find(id);
+        }
+      (simHitIt->second)[0] += hit_it->energy();
+      (simHitIt->second)[1] += hit_it->energy()*hit_it->time();
     }
 }
 
@@ -368,31 +254,14 @@ void HGCSimHitsAnalyzer::analyzeHEDigis(size_t isd,edm::Handle<HGCHEDigiCollecti
       if(hit_it->size()==0) continue;
       float rawDigi=hit_it->sample(0).raw();      
       HGCHEDetId detId(hit_it->id());
-
-      int layer=detId.layer();
-      int zpos=detId.zside();
-      int layerKey(layer);
-      if(zpos<0) layerKey *= -1;
-      std::pair<int,int> sectorKey(isd,layerKey);
-      int sector=detId.sector();
-      int subsector=detId.subsector();
-      int cell=detId.cell();
-          
-      if(allSectors_.find(sectorKey)==allSectors_.end()){
-	//std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
-	continue;
-      }
-      else if(allSectors_[sectorKey].size()<size_t(sector))
-	{
-	  //std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
-	  continue;
-	}
-      
-      //get local coordinates
-      std::pair<float,float> xy = numberingSchemes_[isd]->getDDDConstants()->locateCell(cell,layer,subsector,true);
-     
-      //accumulate energy
-      allSectors_[sectorKey][sector-1].digitize(rawDigi,xy.first,xy.second);
+      HGCSimHitDataAccumulator::iterator simHitIt=simHitData_[isd].find(detId);
+      if(simHitIt==simHitData_[isd].end())
+        {
+          HGCSimHitData baseData(3,0);
+          simHitData_[isd][detId]=baseData;
+          simHitIt=simHitData_[isd].find(detId);
+        }
+      (simHitIt->second)[2] = rawDigi;
     }
 }
 
@@ -408,31 +277,14 @@ void HGCSimHitsAnalyzer::analyzeEEDigis(size_t isd,edm::Handle<HGCEEDigiCollecti
       if(hit_it->size()==0) continue;
       float rawDigi=hit_it->sample(0).raw();      
       HGCEEDetId detId(hit_it->id());
-
-      int layer=detId.layer();
-      int zpos=detId.zside();
-      int layerKey(layer);
-      if(zpos<0) layerKey *= -1;
-      std::pair<int,int> sectorKey(isd,layerKey);
-      int sector=detId.sector();
-      int subsector=detId.subsector();
-      int cell=detId.cell();
-          
-      if(allSectors_.find(sectorKey)==allSectors_.end()){
-	//std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find layer parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << std::endl;
-	continue;
-      }
-      else if(allSectors_[sectorKey].size()<size_t(sector))
-	{
-	  //std::cout << "[HGCSimHitsAnalyzer][analyzeDigis] unable to find sector parameters for detId=0x" << hex << uint32_t(detId) << dec << " iSD=" << isd << " layer=" << layerKey << " sector=" << sector << std::endl;
-	  continue;
-	}
-      
-      //get local coordinates
-      std::pair<float,float> xy = numberingSchemes_[isd]->getDDDConstants()->locateCell(cell,layer,subsector,true);
-     
-      //accumulate energy
-      allSectors_[sectorKey][sector-1].digitize(rawDigi,xy.first,xy.second);
+      HGCSimHitDataAccumulator::iterator simHitIt=simHitData_[isd].find(detId);
+      if(simHitIt==simHitData_[isd].end())
+        {
+          HGCSimHitData baseData(3,0);
+          simHitData_[isd][detId]=baseData;
+          simHitIt=simHitData_[isd].find(detId);
+        }
+      (simHitIt->second)[2] = rawDigi;
     }
 }
 
