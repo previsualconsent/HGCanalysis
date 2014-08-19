@@ -102,11 +102,11 @@ void HGCSimHitsAnalyzer::analyzeG4information(edm::Handle<edm::SimTrackContainer
   
   //compute energy loss in tracker 
   // save secondaries in the calorimeter
-  simEvt_.dEnInTracker=0;
+  simEvt_.g4_dEnInTracker=0;
   for (unsigned int isimvtx = 1; isimvtx < SimVtx->size() ; isimvtx++ )
     {
       const math::XYZTLorentzVectorD& pos=SimVtx->at(isimvtx).position();
-      bool isInTracker( fabs(pos.z())< 320);
+      bool isInTracker( fabs(pos.z())< 320); //yes...this is hardcoded
 
       for (unsigned int isimtk = 0; isimtk < SimTk->size() ; isimtk++ )
 	{
@@ -119,7 +119,7 @@ void HGCSimHitsAnalyzer::analyzeG4information(edm::Handle<edm::SimTrackContainer
 	  //if primary and in the tracker update its energy
 	  if( isInTracker && tk.genpartIndex()==primtk.genpartIndex() ) 
 	    {
-	      simEvt_.dEnInTracker = tk.momentum().energy();
+	      simEvt_.g4_dEnInTracker = tk.momentum().energy();
 	    }
 
 	  //if in the calorimeter save everything
@@ -139,7 +139,7 @@ void HGCSimHitsAnalyzer::analyzeG4information(edm::Handle<edm::SimTrackContainer
     }
 
   //subtract incoming energy
-  simEvt_.dEnInTracker=-simEvt_.g4_en[0];
+  simEvt_.g4_dEnInTracker=-simEvt_.g4_en[0];
 }
 
 //

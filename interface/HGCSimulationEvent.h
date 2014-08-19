@@ -8,8 +8,9 @@
 #define MAXTKSPEREVENT 1000
 #define MAXHGCHITSPEREVENT 1000000
 
-typedef struct { 
-
+struct  HGCSimEvent_t
+{ 
+  //event identifier
   Int_t run, lumi, event;
 
   //generator level
@@ -20,7 +21,7 @@ typedef struct {
   Int_t   ng4,g4_id[MAXG4PEREVENT];
   Float_t g4_vtx[MAXG4PEREVENT],g4_vty[MAXG4PEREVENT],g4_vtz[MAXG4PEREVENT];
   Float_t g4_en[MAXG4PEREVENT], g4_eta[MAXG4PEREVENT],g4_phi[MAXG4PEREVENT];
-  Float_t dEnInTracker;
+  Float_t g4_dEnInTracker;
   
   //tracks and their extrapolation to HGCal
   Int_t ntk,tk_nhits[MAXTKSPEREVENT];
@@ -36,7 +37,14 @@ typedef struct {
   Float_t hit_edep[MAXHGCHITSPEREVENT],hit_edep_sample[MAXHGCHITSPEREVENT][9];
   Short_t digi_adc[MAXHGCHITSPEREVENT];
   
-} HGCSimEvent_t;
+  HGCSimEvent_t()
+  {
+    ng4=0;
+    ngen=0;
+    ntk=0;
+    nhits=0;
+  }
+};
 
 
 void initHGCSimulationEventTree(TTree *t,HGCSimEvent_t &simEvt);
