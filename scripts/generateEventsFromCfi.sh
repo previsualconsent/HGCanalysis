@@ -1,5 +1,5 @@
 #!/bin/bash
-#configure
+
 
 #
 # PARSE CONFIGURATION PARAMETERS
@@ -15,7 +15,7 @@ while getopts "hp:e:n:c:o:w:j:" opt; do
     case "$opt" in
     h)
         echo ""
-        echo "generateParticleGun.sh [OPTIONS]"
+        echo "generateEventsFromCfi.sh [OPTIONS]"
 	echo "     -p      pdg ids to generate (csv)"
 	echo "     -e      energy to generate"
 	echo "     -n      number of events go generate"
@@ -76,8 +76,7 @@ rm ${WORKDIR}/${PYFILE}.bak
 #
 cmsRun ${WORKDIR}/${PYFILE} > ${WORKDIR}/${LOGFILE} 2>&1
 
-if [[ $STOREDIR =~ .*/store/cmst3.* ]]
-then
+if [[ $STOREDIR =~ .*/store/cmst3.* ]]; then
     cmsMkdir ${STOREDIR}
     cmsStage -f ${WORKDIR}/${OUTFILE} ${STOREDIR}/${OUTFILE}
     rm ${WORKDIR}/${OUTFILE}
