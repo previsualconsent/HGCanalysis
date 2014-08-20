@@ -11,13 +11,23 @@ To update in the remote
 
 git push git@github.com:PFCal-dev/HGCanalysis
 
-Submit local production
+GEN-SIM-RECO production
 
-python scripts/submitLocalHGCalProduction.py -q 1nd -n 100  -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleMuon_v14     -r XXX_PID_XXX:13
-python scripts/submitLocalHGCalProduction.py -q 1nd -n 500  -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleElectron_v14 -r XXX_PID_XXX:11
-python scripts/submitLocalHGCalProduction.py -q 1nd -n 100  -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SinglePion_v14     -r XXX_PID_XXX:211
-python scripts/submitLocalHGCalProduction.py -q 1nd -n 100  -c test/runParticleGun_GEN_SIM_cfg.py -o /store/cmst3/group/hgcal/CMSSW/SingleQuark_v14    -r XXX_PID_XXX:1
-python scripts/submitLocalHGCalProduction.py -q 1nd -n 2000 -c test/runMinBias_GEN_SIM_cfg.py     -o /store/cmst3/group/hgcal/CMSSW/MinBias_v14
+Particle gun: use the script scripts/generateParticleGun.sh to generate locally a flat eta, fixed energy particle gun
+
+Full process: use the script scripts/generateSample.sh to generate other processes with existing cfi (to be updated)
+
+Submit production to the batch:
+
+energies=(5 10 20 30 50 100 250)
+pids=(11 13 211)
+for pid in ${pids[@]}; do
+for en in ${energies[@]}; do
+	python scripts/submitLocalHGCalProduction.py -q 1nd -n 3 -s generateParticleGun.sh -o "-o /store/cmst3/group/hgcal/CMSSW/Single${PID}_SLHC16 -p ${pid} -n 500 -e ${en}";
+done
+done
+
+#check this point forward
 
 Submit ntuples production
 for i in `seq 0 50 1950`; do
