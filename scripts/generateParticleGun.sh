@@ -56,7 +56,7 @@ LOGFILE=${BASEJOBNAME}.log
 #run cmsDriver
 cmsDriver.py ${CFI} -n ${NEVENTS} \
     --python_filename ${WORKDIR}/${PYFILE} --fileout file:${WORKDIR}/${OUTFILE} \
-    -s GEN,SIM,DIGI:pdigi_valid,L1,DIGI2RAW,RAW2DIGI,L1Reco,RECO --datatier GEN-SIM-DIGI-RECO --eventcontent FEVTDEBUGHLT,DQM\
+    -s GEN,SIM,DIGI:pdigi_valid,L1,DIGI2RAW,RAW2DIGI,L1Reco,RECO --datatier GEN-SIM-DIGI-RECO --eventcontent FEVTDEBUGHLT\
     --conditions auto:upgradePLS3 --beamspot Gauss --magField 38T_PostLS1 \
     --customise SLHCUpgradeSimulations/Configuration/combinedCustoms.cust_2023HGCalMuon \
     --geometry Extended2023HGCalMuon,Extended2023HGCalMuonReco \
@@ -67,7 +67,7 @@ echo "process.g4SimHits.StackingAction.SaveFirstLevelSecondary = True" >> ${WORK
 echo "process.RandomNumberGeneratorService.generator.initialSeed = cms.untracked.uint32(${JOBNB})" >> ${WORKDIR}/${PYFILE}
 SUBSTRING="s/MinE = cms.double(0)/MinE = cms.double(${ENERGY})/"
 SUBSTRING="${SUBSTRING};s/MaxE = cms.double(0)/MaxE = cms.double(${ENERGY})/"
-SUBSTRING="${SUBSTRING};s/ParticleId = cms.vint32(0)/ParticleId = cms.vint32(${PID})/"
+SUBSTRING="${SUBSTRING};s/ParticleID = cms.vint32(0)/ParticleID = cms.vint32(${PID})/"
 sed -i.bak "${SUBSTRING}" ${WORKDIR}/${PYFILE}
 rm ${WORKDIR}/${PYFILE}.bak
 
