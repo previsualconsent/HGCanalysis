@@ -56,7 +56,7 @@ LOGFILE=${BASEJOBNAME}.log
 #run cmsDriver
 cmsDriver.py ${CFI} -n ${NEVENTS} \
     --python_filename ${WORKDIR}/${PYFILE} --fileout file:${WORKDIR}/${OUTFILE} \
-    -s GEN,SIM,DIGI:pdigi_valid,L1,DIGI2RAW,RAW2DIGI,L1Reco,RECO --datatier GEN-SIM-DIGI-RECO --eventcontent FEVTDEBUG \
+    -s GEN,SIM,DIGI:pdigi_valid,L1,DIGI2RAW,RAW2DIGI,L1Reco,RECO --datatier GEN-SIM-DIGI-RECO --eventcontent FEVTDEBUGHLT,DQM\
     --conditions auto:upgradePLS3 --beamspot Gauss --magField 38T_PostLS1 \
     --customise SLHCUpgradeSimulations/Configuration/combinedCustoms.cust_2023HGCalMuon \
     --geometry Extended2023HGCalMuon,Extended2023HGCalMuonReco \
