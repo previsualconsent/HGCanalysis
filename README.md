@@ -27,7 +27,7 @@ energies=(5 10 20 30 50 100 250)
 pids=(11 13 211)
 for pid in ${pids[@]}; do
 for en in ${energies[@]}; do
-	python scripts/submitLocalHGCalProduction.py -q 1nd -n 3 -s generateEventsFromCfi.sh -o "-o /store/cmst3/group/hgcal/CMSSW/Single${PID}_SLHC16 -p ${pid} -n 500 -e ${en}";
+	python scripts/submitLocalHGCalProduction.py -q 1nd -n 5 -s generateEventsFromCfi.sh -o "-o /store/cmst3/group/hgcal/CMSSW/Single${PID}_SLHC16 -p ${pid} -n 500 -e ${en}";
 done
 done
 
