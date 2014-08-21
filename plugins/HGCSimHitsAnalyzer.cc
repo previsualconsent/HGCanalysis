@@ -67,9 +67,11 @@ void HGCSimHitsAnalyzer::analyzeGenParticles(edm::Handle<edm::View<reco::Candida
   if(!genParticles.isValid()) return;
   if(genParticles->size()==0) return;
 
+  //store a summary of stable gen particles
   for(size_t i = 0; i < genParticles->size(); ++ i)
     {
       const reco::GenParticle & p = dynamic_cast<const reco::GenParticle &>( (*genParticles)[i] );
+      if(p.status()!=1) continue;
       simEvt_.gen_id[simEvt_.ngen]=p.pdgId();
       simEvt_.gen_pt[simEvt_.ngen]=p.pt();
       simEvt_.gen_eta[simEvt_.ngen]=p.eta();
@@ -84,62 +86,50 @@ void HGCSimHitsAnalyzer::analyzeGenParticles(edm::Handle<edm::View<reco::Candida
 void HGCSimHitsAnalyzer::analyzeG4information(edm::Handle<edm::SimTrackContainer> &SimTk,edm::Handle<edm::SimVertexContainer> &SimVtx)
 {
   simEvt_.ng4=0;
+  simEvt_.g4_dEnInTracker=0;
+  simEvt_.g4_dEnIonInTracker=0;
+
   if(!SimTk.isValid() || !SimVtx.isValid()) return;
   if(SimTk->size()==0) return;
   
-  //the primary
-  const SimTrack &primtk=SimTk->at(0);
-  const math::XYZTLorentzVectorD& primpos = SimVtx->at(0).position();
-  const math::XYZTLorentzVectorD &primp4  = primtk.momentum() ;
-  simEvt_.g4_id [0] = primtk.type();
-  simEvt_.g4_vtx[0] = primpos.x();
-  simEvt_.g4_vty[0] = primpos.y();
-  simEvt_.g4_vtz[0] = primpos.z();
-  simEvt_.g4_en [0] = primp4.energy();
-  simEvt_.g4_eta[0] = primp4.eta();
-  simEvt_.g4_phi[0] = primp4.phi();
-  simEvt_.ng4++;
-  
-  //compute energy loss in tracker 
-  // save secondaries in the calorimeter
-  simEvt_.g4_dEnInTracker=0;
-  for (unsigned int isimvtx = 1; isimvtx < SimVtx->size() ; isimvtx++ )
+  //neglect primary (entry=0) which is already stored in the genParticles collection
+  //compute energy loss in tracker and save secondaries in the calorimeter
+  for (unsigned int isimtk = 1; isimtk < SimTk->size() ; isimtk++ )
     {
-      const math::XYZTLorentzVectorD& pos=SimVtx->at(isimvtx).position();
-      bool isInTracker( fabs(pos.z())< 320); //yes...this is hardcoded
+      //the track (neglect nuclei=10 digit number)
+      const SimTrack &tk=SimTk->at(isimtk);
+      if(abs(tk.type())>1000000000) continue;
 
-      for (unsigned int isimtk = 0; isimtk < SimTk->size() ; isimtk++ )
+      const math::XYZTLorentzVectorD &p4 = tk.momentum() ;
+      int vtxIdx=tk.vertIndex();
+      if(vtxIdx<0) continue;
+
+      //the interaction vertex
+      const math::XYZTLorentzVectorD& pos=SimVtx->at(vtxIdx).position();
+      bool isInTracker( fabs(pos.z())< 320); //yes...this is hardcoded but should be fine
+      
+      //energy loss in tracker
+      if( isInTracker ) 
 	{
-	  //get all tracks for this vertex
-	  const SimTrack &tk=SimTk->at(isimtk);
-	  int vtxIdx=tk.vertIndex();
-	  if(vtxIdx<0) continue;
-	  if(vtxIdx!=(int) isimvtx) continue;
-
-	  //if primary and in the tracker update its energy
-	  if( isInTracker && tk.genpartIndex()==primtk.genpartIndex() ) 
-	    {
-	      simEvt_.g4_dEnInTracker = tk.momentum().energy();
-	    }
-
-	  //if in the calorimeter save everything
-	  else if(!isInTracker && simEvt_.ng4<MAXG4PEREVENT)
-	    {
-	      const math::XYZTLorentzVectorD &p4 = tk.momentum() ;
-	      simEvt_.g4_id[simEvt_.ngen] = tk.type();
-	      simEvt_.g4_vtx[simEvt_.ngen] = pos.x();
-	      simEvt_.g4_vty[simEvt_.ngen] = pos.y();
-	      simEvt_.g4_vtz[simEvt_.ngen] = pos.z();
-	      simEvt_.g4_en[simEvt_.ngen] = p4.energy();
-	      simEvt_.g4_eta[simEvt_.ngen] = p4.eta();
-	      simEvt_.g4_phi[simEvt_.ngen] = p4.phi();
-	      simEvt_.ngen++;
-	    }
+	  //if electron in the tracker, assume as ionization or delta- ray 
+	  if(abs(tk.type())==11)   simEvt_.g4_dEnIonInTracker += p4.energy();
+	  simEvt_.g4_dEnInTracker += p4.energy();
+	}
+      
+      //if possible save all secondaries until primary is exctinct
+      if(simEvt_.ng4<MAXG4PEREVENT)
+	{
+	  simEvt_.g4_id[simEvt_.ng4]  = tk.type();
+	  simEvt_.g4_vtx[simEvt_.ng4] = pos.x();
+	  simEvt_.g4_vty[simEvt_.ng4] = pos.y();
+	  simEvt_.g4_vtz[simEvt_.ng4] = pos.z();
+	  simEvt_.g4_en[simEvt_.ng4]  = p4.energy();
+	  simEvt_.g4_eta[simEvt_.ng4] = p4.eta();
+	  simEvt_.g4_phi[simEvt_.ng4] = p4.phi();
+	  simEvt_.ng4++;
 	}
     }
 
-  //subtract incoming energy
-  simEvt_.g4_dEnInTracker=-simEvt_.g4_en[0];
 }
 
 //
@@ -157,7 +147,7 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
     {
       cout << "[HGCSimHitsAnalyzer][analyzeTrackingInformation] starting tracking propagators" << endl;
       piTkPropagator_ = new PropagatorWithMaterial(alongMomentum,0.1396, bField.product());
-
+      simEvt_.nlay=0;
       Surface::RotationType rot; //unit rotation matrix
       for(std::map<int,const HGCalGeometry *>::iterator it = hgcGeometries.begin(); it!= hgcGeometries.end(); it++)
 	{
@@ -183,8 +173,12 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
 	    }
 	  minusSurface_[it->first] = iMinusSurfaces;
 	  plusSurface_[it->first] = iPlusSurfaces;
-	  std::cout << " | total " << minusSurface_[it->first].size() << " layers for subdet #" << it->first << std::endl;
+	  size_t nLayersInSD(minusSurface_[it->first].size());
+	  simEvt_.nlay += nLayersInSD;
+	  std::cout << " | total " << nLayersInSD << " layers for subdet #" << it->first << std::endl;
 	}
+      
+      std::cout << "[HGCSimHitsAnalyzer][analyzeTrackingInformation] will extrapolate tracks for " << simEvt_.nlay << " assuming the pion mass" << std::endl;
     }
 
 
@@ -208,7 +202,7 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
 	  for(size_t ilayer=0; ilayer<it->second.size(); ilayer++)
 	    {
 	      TrajectoryStateOnSurface piStateAtSurface = piTkPropagator_->propagate (myTSOS, *((it->second)[ilayer]) );
-	      if(piStateAtSurface.isValid())
+	      if(piStateAtSurface.isValid() && iextrapol<MAXLAYERSINGEO)
 		{
 		  GlobalPoint pt=piStateAtSurface.globalPosition();
 		  simEvt_.tk_extrapol_sd[simEvt_.ntk][iextrapol]=it->first;
@@ -228,8 +222,6 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
 //
 void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetup &iSetup)
 {
-  cout << "[HGCSimHitsAnalyzer::analyze] start" << endl;
-  
   //event header
   simEvt_.run    = iEvent.id().run();
   simEvt_.lumi   = iEvent.luminosityBlock();
@@ -277,6 +269,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 
   //hits, digis
   simEvt_.nhits=0;
+  /*
   for(size_t i=0; i<hitCollections_.size(); i++)
     {
       edm::Handle<edm::PCaloHitContainer> caloHits;
@@ -296,9 +289,9 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 	  analyzeEEDigis(i,eeDigis);
 	}
     }
-  
 
   //dump accumulators to tree and reset
+  cout << __LINE__ << endl;  
   for(size_t isd=0; isd<simHitData_.size(); isd++)
     {
       for(HGCSimHitDataAccumulator::iterator dit=simHitData_[isd].begin(); dit!=simHitData_[isd].end(); dit++)
@@ -328,9 +321,11 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 	  simEvt_.nhits++;
 	}
     }
- 
+  */
   //fill tree
-  if(simEvt_.nhits>0)  t_->Fill();
+  cout << __LINE__ << endl;  
+  //if(simEvt_.nhits>0) 
+  t_->Fill();
 }
 
 
