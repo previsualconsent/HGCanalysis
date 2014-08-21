@@ -8,11 +8,15 @@
 #define MAXTKSPEREVENT 1000
 #define MAXHGCHITSPEREVENT 1000000
 #define MAXLAYERSINGEO 100
+#define MAXSDINGEO 5
 
 struct  HGCSimEvent_t
 { 
   //event identifier
   Int_t run, lumi,event;
+
+  //geometry information
+  Short_t nsd,nlay[MAXSDINGEO];
 
   //generator level
   Short_t ngen;
@@ -30,9 +34,7 @@ struct  HGCSimEvent_t
   Int_t ntk;
   Short_t tk_nhits[MAXTKSPEREVENT];
   Float_t tk_pt[MAXTKSPEREVENT],tk_eta[MAXTKSPEREVENT],tk_phi[MAXTKSPEREVENT],tk_chi2[MAXTKSPEREVENT];
-  Short_t nlay;
-  Short_t tk_extrapol_sd[MAXTKSPEREVENT][MAXLAYERSINGEO],tk_extrapol_layer[MAXTKSPEREVENT][MAXLAYERSINGEO];
-  Float_t tk_extrapol_x[MAXTKSPEREVENT][MAXLAYERSINGEO],tk_extrapol_y[MAXTKSPEREVENT][MAXLAYERSINGEO];
+  Float_t tk_extrapol_x[MAXTKSPEREVENT][66],tk_extrapol_y[MAXTKSPEREVENT][66];
 
   //sim hits and ADC counts
   Int_t nhits;
@@ -47,7 +49,7 @@ struct  HGCSimEvent_t
     ng4=0;
     ngen=0;
     ntk=0;
-    nlay=0;
+    nsd=0;
     nhits=0;
   }
 };

@@ -147,7 +147,6 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
     {
       cout << "[HGCSimHitsAnalyzer][analyzeTrackingInformation] starting tracking propagators" << endl;
       piTkPropagator_ = new PropagatorWithMaterial(alongMomentum,0.1396, bField.product());
-      simEvt_.nlay=0;
       Surface::RotationType rot; //unit rotation matrix
       for(std::map<int,const HGCalGeometry *>::iterator it = hgcGeometries.begin(); it!= hgcGeometries.end(); it++)
 	{
@@ -174,10 +173,10 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
 	  minusSurface_[it->first] = iMinusSurfaces;
 	  plusSurface_[it->first] = iPlusSurfaces;
 	  size_t nLayersInSD(minusSurface_[it->first].size());
-	  simEvt_.nlay += nLayersInSD;
+	  simEvt_.nlay[it->first] = nLayersInSD;
 	  std::cout << " | total " << nLayersInSD << " layers for subdet #" << it->first << std::endl;
 	}
-      
+
       std::cout << "[HGCSimHitsAnalyzer][analyzeTrackingInformation] will extrapolate tracks for " << simEvt_.nlay << " assuming the pion mass" << std::endl;
     }
 
@@ -205,14 +204,13 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
 	      if(piStateAtSurface.isValid() && iextrapol<MAXLAYERSINGEO)
 		{
 		  GlobalPoint pt=piStateAtSurface.globalPosition();
-		  simEvt_.tk_extrapol_sd[simEvt_.ntk][iextrapol]=it->first;
-		  simEvt_.tk_extrapol_layer[simEvt_.ntk][iextrapol]=ilayer;
 		  simEvt_.tk_extrapol_x[simEvt_.ntk][iextrapol]=pt.x();
 		  simEvt_.tk_extrapol_y[simEvt_.ntk][iextrapol]=pt.y();
 		  iextrapol++;
 		}
 	    }
 	}
+      
       simEvt_.ntk++;
       if(simEvt_.ntk>=MAXTKSPEREVENT) break;
     }
@@ -253,6 +251,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
       iSetup.get<IdealGeometryRecord>().get(geometrySource_[i],hgcGeo);
       hgcGeometries[i]=hgcGeo.product();
     }
+  simEvt_.nsd=hgcGeometries.size();
 
   //save tracker extrapolation
   if(saveTkExtrapol_)
@@ -323,7 +322,7 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
     }
   */
   //fill tree
-  cout << __LINE__ << endl;  
+  //cout << __LINE__ << endl;  
   //if(simEvt_.nhits>0) 
   t_->Fill();
 }

@@ -6,6 +6,9 @@ void initHGCSimulationEventTree(TTree *t,HGCSimEvent_t &simEvt)
   t->Branch("lumi",      &simEvt.lumi,       "lumi/I");
   t->Branch("event",     &simEvt.event,      "event/I");
 
+  t->Branch("nsd",             &simEvt.nsd,              "nsd/S");
+  t->Branch("nlay",             simEvt.nlay,             "nlay[nsd]/S");
+
   t->Branch("ngen",      &simEvt.ngen,       "ngen/S");
   t->Branch("gen_id",     simEvt.gen_id,     "gen_id[ngen]/I");
   t->Branch("gen_pt",     simEvt.gen_pt,     "gen_pt[ngen]/F");
@@ -25,16 +28,13 @@ void initHGCSimulationEventTree(TTree *t,HGCSimEvent_t &simEvt)
   t->Branch("g4_dEnIonInTracker",    &simEvt.g4_dEnIonInTracker,    "g4_dEnIonInTracker/F");
 
   t->Branch("ntk",              &simEvt.ntk,               "ntk/S");
-  t->Branch("nlay",             &simEvt.nlay,              "nlay/S");
   t->Branch("tk_nhits",          simEvt.tk_nhits,          "tk_nhits[ntk]/S");
   t->Branch("tk_pt",             simEvt.tk_pt,             "tk_pt[ntk]/F");
   t->Branch("tk_eta",            simEvt.tk_eta,            "tk_eta[ntk]/F");
   t->Branch("tk_phi",            simEvt.tk_phi,            "tk_phi[ntk]/F");
   t->Branch("tk_chi2",           simEvt.tk_chi2,           "tk_chi2[ntk]/F");
-  t->Branch("tk_extrapol_sd",    simEvt.tk_extrapol_sd,    "tk_extrapol_sd[ntk][nlay]/S");
-  t->Branch("tk_extrapol_layer", simEvt.tk_extrapol_layer, "tk_extrapol_layer[ntk][nlay]/S");
-  t->Branch("tk_extrapol_x",     simEvt.tk_extrapol_x,     "tk_extrapol_x[ntk][nlay]/F");
-  t->Branch("tk_extrapol_y",     simEvt.tk_extrapol_y,     "tk_extrapol_y[ntk][nlay]/F");
+  t->Branch("tk_extrapol_x",     simEvt.tk_extrapol_x,     "tk_extrapol_x[ntk][66]/F");
+  t->Branch("tk_extrapol_y",     simEvt.tk_extrapol_y,     "tk_extrapol_y[ntk][66]/F");
 
   t->Branch("nhits",     &simEvt.nhits,      "nhits/I");
   t->Branch("hit_type",   simEvt.hit_type,   "hit_type[nhits]/S");

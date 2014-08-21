@@ -11,7 +11,9 @@ CFI=UserCode/HGCanalysis/python/particleGun_cfi.py
 WORKDIR="/tmp/`whoami`/"
 STOREDIR=${WORKDIR}
 JOBNB=1
-while getopts "hp:e:n:c:o:w:j:" opt; do
+GEOMETRY="Extended2023HGCalMuon,Extended2023HGCalMuonReco"
+
+while getopts "hp:e:n:c:o:w:j:g:" opt; do
     case "$opt" in
     h)
         echo ""
@@ -23,6 +25,9 @@ while getopts "hp:e:n:c:o:w:j:" opt; do
 	echo "     -o      output directory (local or eos)"
 	echo "     -w      local work directory (by default /tmp/user)"
         echo "     -j      job number"
+	echo "     -g      geometry"
+	echo "             v4:            Extended2023HGCalV4Muon,Extended2023HGCalV4MuonReco"
+	echo "             v5 (default) : ${GEOMETRY}"
 	echo "     -h      help"
         echo ""
 	exit 0
@@ -40,6 +45,8 @@ while getopts "hp:e:n:c:o:w:j:" opt; do
     w)  WORKDIR=$OPTARG
 	;;
     j)  JOBNB=$OPTARG
+	;;
+    g)  GEOMETRY=$OPTARG
 	;;
     esac
 done
@@ -59,7 +66,7 @@ cmsDriver.py ${CFI} -n ${NEVENTS} \
     -s GEN,SIM,DIGI:pdigi_valid,L1,DIGI2RAW,RAW2DIGI,L1Reco,RECO --datatier GEN-SIM-DIGI-RECO --eventcontent FEVTDEBUGHLT\
     --conditions auto:upgradePLS3 --beamspot Gauss --magField 38T_PostLS1 \
     --customise SLHCUpgradeSimulations/Configuration/combinedCustoms.cust_2023HGCalMuon \
-    --geometry Extended2023HGCalMuon,Extended2023HGCalMuonReco \
+    --geometry ${GEOMETRY} \
     --no_exec 
 
 #customize with values to be generated
