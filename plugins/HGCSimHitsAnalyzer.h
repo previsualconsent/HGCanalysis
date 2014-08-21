@@ -98,7 +98,7 @@ class HGCSimHitsAnalyzer : public edm::EDAnalyzer
   /**
      @short reset accumulators
    */
-  inline void resetAccumulator()
+  inline void resetAccumulators()
     {
       for(size_t isd=0; isd<simHitData_.size(); isd++)
 	for( HGCSimHitDataAccumulator::iterator it = simHitData_[isd].begin(); it!=simHitData_[isd].end(); it++)

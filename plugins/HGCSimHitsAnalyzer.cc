@@ -49,6 +49,9 @@ HGCSimHitsAnalyzer::HGCSimHitsAnalyzer( const edm::ParameterSet &iConfig ) :
   hitCollections_   = iConfig.getUntrackedParameter< std::vector<std::string> >("hitCollections");
   digiCollections_  = iConfig.getUntrackedParameter< std::vector<std::string> >("digiCollections");
 
+  //prepare to collect the hits in accumulators
+  simHitData_.resize(hitCollections_.size());
+
   //init tree
   edm::Service<TFileService> fs;
   t_=fs->make<TTree>("HGC","Event Summary");
@@ -177,7 +180,7 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
 	  std::cout << " | total " << nLayersInSD << " layers for subdet #" << it->first << std::endl;
 	}
 
-      std::cout << "[HGCSimHitsAnalyzer][analyzeTrackingInformation] will extrapolate tracks for " << simEvt_.nlay << " assuming the pion mass" << std::endl;
+      std::cout << "[HGCSimHitsAnalyzer][analyzeTrackingInformation] will extrapolate tracks assuming the pion mass" << std::endl;
     }
 
 
@@ -220,6 +223,8 @@ void HGCSimHitsAnalyzer::analyzeTrackingInformation(edm::Handle<reco::TrackColle
 //
 void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetup &iSetup)
 {
+  resetAccumulators();
+
   //event header
   simEvt_.run    = iEvent.id().run();
   simEvt_.lumi   = iEvent.luminosityBlock();
@@ -268,7 +273,6 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 
   //hits, digis
   simEvt_.nhits=0;
-  /*
   for(size_t i=0; i<hitCollections_.size(); i++)
     {
       edm::Handle<edm::PCaloHitContainer> caloHits;
@@ -290,7 +294,6 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
     }
 
   //dump accumulators to tree and reset
-  cout << __LINE__ << endl;  
   for(size_t isd=0; isd<simHitData_.size(); isd++)
     {
       for(HGCSimHitDataAccumulator::iterator dit=simHitData_[isd].begin(); dit!=simHitData_[isd].end(); dit++)
@@ -320,10 +323,8 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
 	  simEvt_.nhits++;
 	}
     }
-  */
+
   //fill tree
-  //cout << __LINE__ << endl;  
-  //if(simEvt_.nhits>0) 
   t_->Fill();
 }
 
@@ -350,6 +351,7 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
       const HGCalTopology &topo=geom->topology();
       const HGCalDDDConstants &dddConst=topo.dddConstants();
       zPos=dddConst.getFirstTrForm()->h3v.z();
+
       std::pair<int,int> recoLayerCell=dddConst.simToReco(cell,layer,topo.detectorType());
       cell  = recoLayerCell.first;
       layer = recoLayerCell.second;
@@ -361,8 +363,10 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
 		   (uint32_t)HGCHEDetId(ForwardSubdetector(mySubDet),simId.zside(),layer,simId.sector(),simId.subsector(),cell) );
       
       //hit time: [time()]=ns  [zPos]=cm [CLHEP::c_light]=mm/ns
-      //for now accumulate in buckets of 6.25ns = 4 time samples each 25 ns
-      int itime=floor( (hit_it->time()-zPos/(0.1*CLHEP::c_light))/6.25);
+      //for now accumulate in buckets of 6.25ns = 4 time samples each 25 ns 
+      //+1 is added because there is a beamspot smearing which may yield particles to come earlier than expected from a center-of-detector-based expectation
+      int itime=floor( (hit_it->time()-zPos/(0.1*CLHEP::c_light))/6.25)+1;
+      if(itime<0 || itime>8) continue;
       
       HGCSimHitDataAccumulator::iterator simHitIt=simHitData_[isd].find(id);
       if(simHitIt==simHitData_[isd].end())
@@ -372,7 +376,7 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
           simHitData_[isd][id]=baseData;
           simHitIt=simHitData_[isd].find(id);
 	}
-      if( itime > 8) continue; //last will be reserved for the ADC counts
+      
       (simHitIt->second)[itime] += hit_it->energy();
     }
 }
@@ -403,13 +407,13 @@ void HGCSimHitsAnalyzer::analyzeHEDigis(size_t isd,edm::Handle<HGCHEDigiCollecti
 }
 
 //
-void HGCSimHitsAnalyzer::analyzeEEDigis(size_t isd,edm::Handle<HGCEEDigiCollection> &heDigis)
+void HGCSimHitsAnalyzer::analyzeEEDigis(size_t isd,edm::Handle<HGCEEDigiCollection> &eeDigis)
 {
   //check inputs
-  if(!heDigis.isValid()) return;
+  if(!eeDigis.isValid()) return;
   
   //analyze hits
-  for(HGCEEDigiCollection::const_iterator hit_it = heDigis->begin(); hit_it != heDigis->end(); ++hit_it) 
+  for(HGCEEDigiCollection::const_iterator hit_it = eeDigis->begin(); hit_it != eeDigis->end(); ++hit_it) 
     {
       if(hit_it->size()==0) continue;
       float rawDigi=hit_it->sample(0).raw();      
@@ -421,6 +425,7 @@ void HGCSimHitsAnalyzer::analyzeEEDigis(size_t isd,edm::Handle<HGCEEDigiCollecti
 	  baseData.fill(0.);
           simHitData_[isd][detId]=baseData;
           simHitIt=simHitData_[isd].find(detId);
+	  cout << "digi without hit" << " " << rawDigi << endl;
         }
       (simHitIt->second)[9] = rawDigi;
     }
