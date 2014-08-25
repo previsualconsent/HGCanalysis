@@ -278,7 +278,6 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
       edm::Handle<edm::PCaloHitContainer> caloHits;
       iEvent.getByLabel(edm::InputTag("g4SimHits",hitCollections_[i]),caloHits); 
       analyzeHits(i,caloHits,hgcGeometries[i]);
-      
       if(digiCollections_[i].find("HE") != std::string::npos)
 	{
 	  edm::Handle<HGCHEDigiCollection> heDigis;
@@ -298,20 +297,26 @@ void HGCSimHitsAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSetu
     {
       for(HGCSimHitDataAccumulator::iterator dit=simHitData_[isd].begin(); dit!=simHitData_[isd].end(); dit++)
 	{
-	  Float_t edep(0);
-	  for(size_t itime=0; itime<=8; itime++) edep+=dit->second[itime]*1e6;
-	  if(edep<=0) continue;
+
 	  if(simEvt_.nhits>=MAXHGCHITSPEREVENT) break;
 
 	  uint32_t rawDetId = dit->first;
 	  uint32_t layer    = (rawDetId>>19) & 0x1F;	  
 	  simEvt_.hit_type [simEvt_.nhits]=isd;
 	  simEvt_.hit_layer[simEvt_.nhits]=layer;
+	  Float_t edep(0);
+	  for(size_t itime=0; itime<8; itime++) {
+	    simEvt_.hit_edep_sample[simEvt_.nhits][itime]=dit->second[itime]*1e6;
+	    if(itime<3) continue;
+	    edep+=dit->second[itime]*1e6;
+	  }
 	  simEvt_.hit_edep [simEvt_.nhits]=edep;
-	  for(size_t itime=0; itime<=8; itime++) simEvt_.hit_edep_sample[simEvt_.nhits][itime]=dit->second[itime]*1e6;
+
 	  UShort_t adc=(UShort_t)dit->second[9];
 	  simEvt_.digi_adc [simEvt_.nhits]=adc;
 	  
+	  if(edep<=0 && adc<2) continue;
+
 	  //get position
 	  const GlobalPoint pos( std::move( hgcGeometries[isd]->getPosition( rawDetId) ) );
  	  simEvt_.hit_x[simEvt_.nhits]=pos.x();
@@ -363,11 +368,11 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
 		   (uint32_t)HGCHEDetId(ForwardSubdetector(mySubDet),simId.zside(),layer,simId.sector(),simId.subsector(),cell) );
       
       //hit time: [time()]=ns  [zPos]=cm [CLHEP::c_light]=mm/ns
-      //for now accumulate in buckets of 6.25ns = 4 time samples each 25 ns 
-      //+1 is added because there is a beamspot smearing which may yield particles to come earlier than expected from a center-of-detector-based expectation
-      int itime=floor( (hit_it->time()-zPos/(0.1*CLHEP::c_light))/6.25)+1;
-      if(itime<0 || itime>8) continue;
-      
+      //for now accumulate in buckets of 5ns = 5 time samples each 25 ns 
+      //consider 3 pre-samples + 5 time samples
+      int itime=floor( (hit_it->time()-zPos/(0.1*CLHEP::c_light))/5);
+      if(itime<-3 || itime>4) continue;
+
       HGCSimHitDataAccumulator::iterator simHitIt=simHitData_[isd].find(id);
       if(simHitIt==simHitData_[isd].end())
         {
@@ -377,7 +382,7 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
           simHitIt=simHitData_[isd].find(id);
 	}
       
-      (simHitIt->second)[itime] += hit_it->energy();
+      (simHitIt->second)[itime+3] += hit_it->energy();
     }
 }
 
@@ -425,7 +430,6 @@ void HGCSimHitsAnalyzer::analyzeEEDigis(size_t isd,edm::Handle<HGCEEDigiCollecti
 	  baseData.fill(0.);
           simHitData_[isd][detId]=baseData;
           simHitIt=simHitData_[isd].find(detId);
-	  cout << "digi without hit" << " " << rawDigi << endl;
         }
       (simHitIt->second)[9] = rawDigi;
     }
