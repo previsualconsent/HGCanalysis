@@ -30,7 +30,7 @@ for en in ${energies[@]}; do
 	#default geometry
         python scripts/submitLocalHGCalProduction.py -q 1nd -n 5 -s generateEventsFromCfi.sh -o "-o /store/cmst3/group/hgcal/CMSSW/Single${pid}_SLHC16 -p ${pid} -n 1000 -e ${en}";
 	#change geometry scenario
-	python scripts/submitLocalHGCalProduction.py -q 1nd -n 5 -s generateEventsFromCfi.sh -o "-o /store/cmst3/group/hgcal/CMSSW/Single${pid}_SLHC16 -p ${pid} -n 1000 -e ${en} -g Extended2023HGCalV4Muon,Extended2023HGCalV4MuonReco";
+	python scripts/submitLocalHGCalProduction.py -q 1nd -n 5 -s generateEventsFromCfi.sh -o "-o /store/cmst3/group/hgcal/CMSSW/Single${pid}_v4_SLHC16 -p ${pid} -n 1000 -e ${en} -g Extended2023HGCalV4Muon,Extended2023HGCalV4MuonReco";
 done
 done
 
