@@ -364,8 +364,9 @@ void HGCSimHitsAnalyzer::analyzeHits(size_t isd,edm::Handle<edm::PCaloHitContain
        
       //assign the RECO DetId
       uint32_t id( (isd==0) ?
-		   (uint32_t)HGCEEDetId(ForwardSubdetector(mySubDet),simId.zside(),layer,simId.sector(),simId.subsector(),cell):
-		   (uint32_t)HGCHEDetId(ForwardSubdetector(mySubDet),simId.zside(),layer,simId.sector(),simId.subsector(),cell) );
+		   (uint32_t)HGCEEDetId(ForwardSubdetector(mySubDet),simId.zside(),layer,simId.sector(),simId.subsector(),cell) :
+		   (uint32_t)HGCHEDetId(ForwardSubdetector(mySubDet),simId.zside(),layer,simId.sector(),simId.subsector(),cell) 
+		   );
       
       //hit time: [time()]=ns  [zPos]=cm [CLHEP::c_light]=mm/ns
       //for now accumulate in buckets of 5ns = 5 time samples each 25 ns 

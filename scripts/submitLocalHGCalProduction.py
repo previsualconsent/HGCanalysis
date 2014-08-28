@@ -11,7 +11,7 @@ parser = optparse.OptionParser(usage)
 parser.add_option('-q', '--queue'      ,    dest='queue'              , help='batch queue'                                        , default='')
 parser.add_option('-n', '--njobs'      ,    dest='njobs'              , help='number of jobs'                                     , default=1,  type=int)
 parser.add_option('-o', '--options'    ,    dest='options'            , help='script options'                                     , default='')
-parser.add_option('-s', '--script'     ,    dest='script'             , help='script to run'                                      , default='generateParticleGun.sh')
+parser.add_option('-s', '--script'     ,    dest='script'             , help='script to run (look under scripts/)'                , default='generateEventsFromCfi.sh')
 (opt, args) = parser.parse_args()
 
 
