@@ -63,24 +63,18 @@ class HGCCalibration:
             hgcEE[0] = thermal_shield + layer1a
             hgcEE[1] = layer1b + mod1a
 
-            for l in range(2,9,2): #2-9 
-                hgcEE[l] = mod1b #odd
-                hgcEE[l+1] = mod1a + mod1c #even
-            hgcEE[10] = mod1b
+            hgcEE[2:11:2] = mod1b
+            hgcEE[3:11:2] = mod1a + mod1c
 
             hgcEE[11] = mod1c + mod2a
 
-            for l in range(12,19,2): #12 - 19 
-                hgcEE[l] = mod2b #odd
-                hgcEE[l+1] = mod2a + mod2c #even
-            hgcEE[20] = mod2b
+            hgcEE[12:21:2] = mod2b
+            hgcEE[13:21:2] = mod2a + mod2c
 
             hgcEE[21] = mod2c + mod3a
 
-            for l in range(22,27,2): # 22 - 27
-                hgcEE[l] = mod3b #odd
-                hgcEE[l+1] = mod3a + mod3c #even
-            hgcEE[28] = mod3b
+            hgcEE[22:29:2] = mod3b #odd
+            hgcEE[23:29:2] = mod3a + mod3c #even
 
             hgcEE[29] = layer30
 
@@ -106,11 +100,24 @@ class HGCCalibration:
             if includeShielding:
                 hgcHEB[0] += self.getWeight( [Copper], [30.])
             
+        elif version = "v4":
+            hgcEE = np.zeros(31)
+            hgcEE[0] = self.getWeight( [Copper],[3.])
+            hgcEE[1:11] = self.getWeight( [Lead, Copper],[1.6, 3.0])
+            hgcEE[11:21] = self.getWeight( [Lead,Copper],[3.3, 3.0])
+            hgcEE[21:31] = self.getWeight( [Lead,Copper],[5.6, 3.0])
+
+            hgcHEF = np.ones(12)* self.getWeight( [Lead, Copper], [52., 3.0 ])
+            hgcHEB = np.ones(12)* self.getWeight( [Lead, Copper], [52., 3.0 ])
+
+            hgcHEB = np.ones(12) * self.getWeight( [Brass], [34.5*2+9])
+
+
             
-            self.weights = np.array([
-                hgcEE/hgcEE[0],
-                hgcHEF/hgcEE[0],
-                hgcHEB/hgcEE[0]])
+        self.weights = np.array([
+            hgcEE/hgcEE[0],
+            hgcHEF/hgcEE[0],
+            hgcHEB/hgcEE[0]])
 
 
     def getWeight(self, material_list, thickness_list):
