@@ -114,7 +114,7 @@ void HGCGeometryAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSet
 
 	  //test SIM->RECO coordinate assignment
 	  if(simToReco.second<=0) continue;
-	  if(ilay>2) continue;
+	  if(ilay>9) continue;
 
 	  TString name("layer"); name+= ilay; name +="_sd"; name+=i;
 

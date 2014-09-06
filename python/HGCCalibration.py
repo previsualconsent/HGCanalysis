@@ -100,7 +100,7 @@ class HGCCalibration:
             if includeShielding:
                 hgcHEB[0] += self.getWeight( [Copper], [30.])
             
-        elif version = "v4":
+        elif version == "v4":
             hgcEE = np.zeros(31)
             hgcEE[0] = self.getWeight( [Copper],[3.])
             hgcEE[1:11] = self.getWeight( [Lead, Copper],[1.6, 3.0])
