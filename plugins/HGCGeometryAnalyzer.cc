@@ -113,8 +113,8 @@ void HGCGeometryAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSet
 	  cout << endl;
 
 	  //test SIM->RECO coordinate assignment
-	  if(simToReco.second<=0) continue;
-	  if(ilay>9) continue;
+	  int recLay(simToReco.second);
+	  if(recLay<=0) continue;
 
 	  TString name("layer"); name+= ilay; name +="_sd"; name+=i;
 
@@ -122,33 +122,45 @@ void HGCGeometryAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSet
 	  int ncellsy          = 2*simModIt->h/simModIt->cellSize;
 	  int ncellsx          = 2*simModIt->tl/simModIt->cellSize;
 	  TString funcFormula  = "[0]*TMath::Abs(x)+[1]";
-	  float func_slope     = (2*simModIt->h/(simModIt->tl-simModIt->bl));
-	  float func_offset    = -2*simModIt->h*simModIt->bl/(simModIt->tl-simModIt->bl)-simModIt->h;
-	  float xmin           = -ncellsx*simModIt->cellSize/2;
-	  float xmax           = ncellsx*simModIt->cellSize/2;
+	  float func_slope     = 2*simModIt->h/(simModIt->tl-simModIt->bl);
+	  float func_offset    = -2*simModIt->h*simModIt->bl/(simModIt->tl-simModIt->bl);
+	  float xmin           = -simModIt->tl;
+	  float xmax           = simModIt->tl;
+	  float ymin           = 0;
+	  float ymax           = 2*simModIt->h;
 	  float boundaryXmin   = -simModIt->tl;
 	  float boundaryXmax   = simModIt->tl;
+	  float translationX   = 0;
+	  float translationY   = simModIt->h;
 	  if(simModIt->alpha>0)
 	    {
 	      ncellsx      = 2*simModIt->tl/simModIt->cellSize;
 	      funcFormula  = "[0]*x+[1]";
 	      func_slope   = simModIt->h/(simModIt->tl-simModIt->bl);
-	      func_offset  = -simModIt->h*(simModIt->tl+3*simModIt->bl)/(2*(simModIt->tl-simModIt->bl));
-	      xmin         = 0.5*(simModIt->bl-simModIt->tl);
-	      xmax         = xmin+ncellsx*simModIt->cellSize;
-	      boundaryXmin = 0.5*(3*simModIt->bl-simModIt->tl);
+	      func_offset  = -2*simModIt->h*simModIt->bl/(simModIt->tl-simModIt->bl);
+	      xmin         = 0;
+	      xmax         = 2*simModIt->tl;
+	      ymin         = 0;
+	      ymax         = 2*simModIt->h;
+	      boundaryXmin = 2*simModIt->bl;
 	      boundaryXmax = xmax;
+	      translationX = 0.5*(simModIt->tl+simModIt->bl);
+	      translationY = simModIt->h;
 	    }
 	  if(simModIt->alpha<0)
 	    {
 	      ncellsx      = 2*simModIt->tl/simModIt->cellSize;
 	      funcFormula  = "[0]*x+[1]";
 	      func_slope   = -simModIt->h/(simModIt->tl-simModIt->bl);
-	      func_offset  = -simModIt->h*(simModIt->tl+3*simModIt->bl)/(2*(simModIt->tl-simModIt->bl));
-	      xmax         = -0.5*(simModIt->bl-simModIt->tl);
-	      xmin         = xmax-ncellsx*simModIt->cellSize;
+	      func_offset  = -2*simModIt->h*simModIt->bl/(simModIt->tl-simModIt->bl);
+	      xmin         = -2*simModIt->tl;
+	      xmax         = 0;
+	      ymin         = 0;
+	      ymax         = 2*simModIt->h;
 	      boundaryXmin = xmin;
-	      boundaryXmax = -0.5*(3*simModIt->bl-simModIt->tl);
+	      boundaryXmax = -2*simModIt->bl;
+	      translationX = -0.5*(simModIt->tl+simModIt->bl);
+	      translationY = simModIt->h;
 	    }
 	  
 	  TF1 *func=(*fs_)->make<TF1>("boundary_"+name,funcFormula,boundaryXmin,boundaryXmax);
@@ -159,25 +171,25 @@ void HGCGeometryAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSet
 	  func->SetLineStyle(7);
 
 	  TH2F *simCellH = (*fs_)->make<TH2F>("simcell_"+ name, ";Local x [mm];Local y [mm];Sim cell number",
-					      ncellsx+1, xmin-simModIt->cellSize/2,         xmax+simModIt->cellSize/2,
-					      ncellsy+1, -simModIt->h-simModIt->cellSize/2, simModIt->h+simModIt->cellSize/2);
-	  TH2F *simixH = (TH2F *)simCellH->Clone("simix_"+name ); simixH = (*fs_)->make<TH2F>( *simixH );
-	  TH2F *simiyH = (TH2F *)simCellH->Clone("simiy_"+name ); simiyH = (*fs_)->make<TH2F>( *simiyH );
+					      ncellsx,  xmin, xmax,
+					      ncellsy,  ymin, ymax);
+	  TH2F *simixH = (TH2F *)simCellH->Clone("simix_"+name ); simixH = (*fs_)->make<TH2F>( *simixH ); simixH->GetZaxis()->SetTitle("i-x");
+	  TH2F *simiyH = (TH2F *)simCellH->Clone("simiy_"+name ); simiyH = (*fs_)->make<TH2F>( *simiyH ); simiyH->GetZaxis()->SetTitle("i-y");
 	  
 	  //reco 
 	  TH2F *recCellH = (TH2F *)simCellH->Clone("reccell_"+name ); recCellH = (*fs_)->make<TH2F>( *recCellH );
-	  TH2F *recixH = (TH2F *)simCellH->Clone("recix_"+name ); recixH = (*fs_)->make<TH2F>( *recixH );
-	  TH2F *reciyH = (TH2F *)simCellH->Clone("reciy_"+name ); reciyH = (*fs_)->make<TH2F>( *reciyH );
+	  TH2F *recixH = (TH2F *)simCellH->Clone("recix_"+name ); recixH = (*fs_)->make<TH2F>( *recixH ); recixH->GetZaxis()->SetTitle("i-x");
+	  TH2F *reciyH = (TH2F *)simCellH->Clone("reciy_"+name ); reciyH = (*fs_)->make<TH2F>( *reciyH ); reciyH->GetZaxis()->SetTitle("i-y");
 
 	  //sim-reco diff
-	  TH2F *dxH = (TH2F *)simCellH->Clone("dx_"+name ); dxH = (*fs_)->make<TH2F>( *dxH );
-	  TH2F *dyH = (TH2F *)simCellH->Clone("dy_"+name ); dyH = (*fs_)->make<TH2F>( *dyH );
+	  TH2F *dxH = (TH2F *)simCellH->Clone("dx_"+name ); dxH = (*fs_)->make<TH2F>( *dxH ); dxH->GetZaxis()->SetTitle("#Delta x(SIM, RECO) [mm]");
+	  TH2F *dyH = (TH2F *)simCellH->Clone("dy_"+name ); dyH = (*fs_)->make<TH2F>( *dyH ); dyH->GetZaxis()->SetTitle("#Delta y(SIM, RECO) [mm]");
 	  
 	  for(int xbin=1; xbin<=simCellH->GetXaxis()->GetNbins(); xbin++)
 	    for(int ybin=1; ybin<=simCellH->GetYaxis()->GetNbins(); ybin++)
 	      {
-		float x    = simCellH->GetXaxis()->GetBinCenter(xbin);
-		float y    = simCellH->GetYaxis()->GetBinCenter(ybin);
+		float x    = simCellH->GetXaxis()->GetBinCenter(xbin)-translationX;
+		float y    = simCellH->GetYaxis()->GetBinCenter(ybin)-translationY;
 
 		int subsec(x<0 ? 0 : 1);
 		if(simModIt->alpha<0) subsec=0;
@@ -185,34 +197,23 @@ void HGCGeometryAnalyzer::analyze( const edm::Event &iEvent, const edm::EventSet
 
 		int simcell = dddConst.assignCell(x,y,ilay,subsec,false).second;
 		simCellH->SetBinContent(xbin,ybin,simcell);
-		int reccell = dddConst.assignCell(x/10.,y/10.,ilay,subsec,true).second;
+		int reccell = dddConst.assignCell(x/10.,y/10.,recLay,subsec,true).second;
 		recCellH->SetBinContent(xbin,ybin,reccell);
 		
 		std::pair<int,int> ixy=dddConst.findCell(simcell,ilay,subsec,false);
 		simixH->SetBinContent(xbin,ybin,ixy.first);
 		simiyH->SetBinContent(xbin,ybin,ixy.second);
 		
-		std::pair<int,int> irecxy=dddConst.findCell(reccell,ilay,subsec,true);
+		std::pair<int,int> irecxy=dddConst.findCell(reccell,recLay,subsec,true);
 		recixH->SetBinContent(xbin,ybin,irecxy.first);
 		reciyH->SetBinContent(xbin,ybin,irecxy.second);
 		
-		//if(ybin<4 && simcell>=0)
-		//  {
-		//   cout  << x << "," << y << " -> " << simcell << " cell " <<  ixy.first << "," << ixy.second << " -> " << reccell << endl;
-		//  }
-
 		//local coordinates (sim and reco)
 		if(reccell>=0 && simcell>=0){
 		  std::pair<float,float> simxy=dddConst.locateCell(simcell,ilay,subsec,false);
-		  std::pair<float,float> recxy=dddConst.locateCell(reccell,ilay,subsec,true);
+		  std::pair<float,float> recxy=dddConst.locateCell(reccell,recLay,subsec,true);
 		  float dx=(simxy.first-recxy.first*10);
 		  if(fabs(dx)<1e-3) dx=0;
-// 		  if(dx>10){
-// 		    std::cout << dx << " " << simcell << ": "
-// 			      << ixy.first << " " << ixy.second << " "
-// 			      << "\t " << reccell << ": "
-// 			      << irecxy.first << " " << irecxy.second << std::endl;
-// 		  }
 		  dxH->SetBinContent(xbin,ybin,dx);
 		  float dy=(simxy.second-recxy.second*10);
 		  if(fabs(dy)<1e-3) dy=0;
