@@ -14,8 +14,9 @@ JOBNB=1
 GEOMETRY="Extended2023HGCalMuon,Extended2023HGCalMuonReco"
 PILEUP=""
 TAG=""
+PILEUPINPUT=root://eoscms//eos/cms/store/cmst3/group/hgcal/CMSSW/MinBias_CMSSW_6_2_X_SLHC_2014-09-10-0200/
 
-while getopts "hp:e:n:c:o:w:j:g:ut:" opt; do
+while getopts "hp:e:n:c:o:w:j:g:ut:i:" opt; do
     case "$opt" in
     h)
         echo ""
@@ -30,6 +31,9 @@ while getopts "hp:e:n:c:o:w:j:g:ut:" opt; do
 	echo "     -g      geometry"
 	echo "             v4:            Extended2023HGCalV4Muon,Extended2023HGCalV4MuonReco"
 	echo "             v5 (default) : ${GEOMETRY}"
+	echo "     -u      Turn on Pileup"
+        echo "     -i      pileup input file"
+        echo "     -t      tag to name output file"
 	echo "     -h      help"
         echo ""
 	exit 0
@@ -50,9 +54,11 @@ while getopts "hp:e:n:c:o:w:j:g:ut:" opt; do
 	;;
     g)  GEOMETRY=$OPTARG
 	;;
-    u)  PILEUP="--pileup AVE_140_BX_25ns --pileup_input dbs:/RelValMinBias_TuneZ2star_14TeV/CMSSW_6_2_0_SLHC16-DES23_62_V1_UPGHGCalV4-v1/GEN-SIM"
+    u)  PILEUP="--pileup AVE_140_BX_25ns"
         ;;
     t)  TAG=$OPTARG
+        ;;
+    i)  PILEUPINPUT=$OPTARG
         ;;
     esac
 done
@@ -68,6 +74,10 @@ BASEJOBNAME=${BASEJOBNAME/","/"_"}
 OUTFILE=${BASEJOBNAME}.root
 PYFILE=${BASEJOBNAME}_cfg.py
 LOGFILE=${BASEJOBNAME}.log
+
+if [ "$PILEUP" = "" ]; then
+    PILEUP="${PILEUP} --pileup_input ${PILEUPINPUT}"
+fi
 
 #run cmsDriver
 cmsDriver.py ${CFI} -n ${NEVENTS} \
