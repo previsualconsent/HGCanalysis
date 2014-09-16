@@ -12,8 +12,10 @@ WORKDIR="/tmp/`whoami`/"
 STOREDIR=${WORKDIR}
 JOBNB=1
 GEOMETRY="Extended2023HGCalMuon,Extended2023HGCalMuonReco"
+PILEUP=""
+TAG=""
 
-while getopts "hp:e:n:c:o:w:j:g:" opt; do
+while getopts "hp:e:n:c:o:w:j:g:ut:" opt; do
     case "$opt" in
     h)
         echo ""
@@ -48,13 +50,20 @@ while getopts "hp:e:n:c:o:w:j:g:" opt; do
 	;;
     g)  GEOMETRY=$OPTARG
 	;;
+    u)  PILEUP="--pileup AVE_140_BX_25ns --pileup_input dbs:/RelValMinBias_TuneZ2star_14TeV/CMSSW_6_2_0_SLHC16-DES23_62_V1_UPGHGCalV4-v1/GEN-SIM"
+        ;;
+    t)  TAG=$OPTARG
+        ;;
     esac
 done
 
 #
 # CONFIGURE JOB
 #
-BASEJOBNAME=HGCEvents_${PID}_${ENERGY}_${JOBNB}
+if [ "$TAG" = "" ]; then
+   TAG=${PID}_${ENERGY}
+fi
+BASEJOBNAME=HGCEvents_${TAG}_${JOBNB}
 BASEJOBNAME=${BASEJOBNAME/","/"_"}
 OUTFILE=${BASEJOBNAME}.root
 PYFILE=${BASEJOBNAME}_cfg.py
@@ -63,6 +72,7 @@ LOGFILE=${BASEJOBNAME}.log
 #run cmsDriver
 cmsDriver.py ${CFI} -n ${NEVENTS} \
     --python_filename ${WORKDIR}/${PYFILE} --fileout file:${WORKDIR}/${OUTFILE} \
+    $PILEUP \
     -s GEN,SIM,DIGI:pdigi_valid,L1,DIGI2RAW,RAW2DIGI,L1Reco,RECO --datatier GEN-SIM-DIGI-RECO --eventcontent FEVTDEBUGHLT\
     --conditions auto:upgradePLS3 --beamspot Gauss --magField 38T_PostLS1 \
     --customise SLHCUpgradeSimulations/Configuration/combinedCustoms.cust_2023HGCalMuon \
@@ -72,6 +82,7 @@ cmsDriver.py ${CFI} -n ${NEVENTS} \
 #customize with values to be generated
 echo "process.g4SimHits.StackingAction.SaveFirstLevelSecondary = True" >> ${WORKDIR}/${PYFILE}
 echo "process.RandomNumberGeneratorService.generator.initialSeed = cms.untracked.uint32(${JOBNB})" >> ${WORKDIR}/${PYFILE}
+echo "process.source.firstEvent=cms.untracked.uint32($((NEVENTS*(JOBNB-1)+1)))" >> ${WORKDIR}/${PYFILE}
 SUBSTRING="s/MinE = cms.double(0)/MinE = cms.double(${ENERGY})/"
 SUBSTRING="${SUBSTRING};s/MaxE = cms.double(0)/MaxE = cms.double(${ENERGY})/"
 SUBSTRING="${SUBSTRING};s/ParticleID = cms.vint32(0)/ParticleID = cms.vint32(${PID})/"
