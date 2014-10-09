@@ -14,9 +14,10 @@ JOBNB=1
 GEOMETRY="Extended2023HGCalMuon,Extended2023HGCalMuonReco"
 PILEUP=""
 TAG=""
+FILTER=""
 PILEUPINPUT=root://eoscms//eos/cms/store/cmst3/group/hgcal/CMSSW/MinBias_CMSSW_6_2_X_SLHC_2014-09-10-0200/
 
-while getopts "hp:e:n:c:o:w:j:g:ut:i:" opt; do
+while getopts "hp:e:n:c:o:w:j:g:ut:i:f" opt; do
     case "$opt" in
     h)
         echo ""
@@ -60,6 +61,8 @@ while getopts "hp:e:n:c:o:w:j:g:ut:i:" opt; do
         ;;
     i)  PILEUPINPUT=$OPTARG
         ;;
+    f)
+        FILTER=":ProductionFilterSequence"
     esac
 done
 
@@ -75,7 +78,7 @@ OUTFILE=${BASEJOBNAME}.root
 PYFILE=${BASEJOBNAME}_cfg.py
 LOGFILE=${BASEJOBNAME}.log
 
-if [ "$PILEUP" = "" ]; then
+if [ "$PILEUP" != "" ]; then
     PILEUP="${PILEUP} --pileup_input ${PILEUPINPUT}"
 fi
 
@@ -83,7 +86,7 @@ fi
 cmsDriver.py ${CFI} -n ${NEVENTS} \
     --python_filename ${WORKDIR}/${PYFILE} --fileout file:${WORKDIR}/${OUTFILE} \
     $PILEUP \
-    -s GEN,SIM,DIGI:pdigi_valid,L1,DIGI2RAW,RAW2DIGI,L1Reco,RECO --datatier GEN-SIM-DIGI-RECO --eventcontent FEVTDEBUGHLT\
+    -s GEN${FILTER},SIM,DIGI:pdigi_valid,L1,DIGI2RAW,RAW2DIGI,L1Reco,RECO --datatier GEN-SIM-DIGI-RECO --eventcontent FEVTDEBUGHLT\
     --conditions auto:upgradePLS3 --beamspot Gauss --magField 38T_PostLS1 \
     --customise SLHCUpgradeSimulations/Configuration/combinedCustoms.cust_2023HGCalMuon \
     --geometry ${GEOMETRY} \
@@ -92,10 +95,14 @@ cmsDriver.py ${CFI} -n ${NEVENTS} \
 #customize with values to be generated
 echo "process.g4SimHits.StackingAction.SaveFirstLevelSecondary = True" >> ${WORKDIR}/${PYFILE}
 echo "process.RandomNumberGeneratorService.generator.initialSeed = cms.untracked.uint32(${JOBNB})" >> ${WORKDIR}/${PYFILE}
-echo "process.source.firstEvent=cms.untracked.uint32($((NEVENTS*(JOBNB-1)+1)))" >> ${WORKDIR}/${PYFILE}
+#Commenting out since it doesn't make sense with a gen filter
+#echo "process.source.firstEvent=cms.untracked.uint32($((NEVENTS*(JOBNB-1)+1)))" >> ${WORKDIR}/${PYFILE}
 SUBSTRING="s/MinE = cms.double(0)/MinE = cms.double(${ENERGY})/"
 SUBSTRING="${SUBSTRING};s/MaxE = cms.double(0)/MaxE = cms.double(${ENERGY})/"
 SUBSTRING="${SUBSTRING};s/ParticleID = cms.vint32(0)/ParticleID = cms.vint32(${PID})/"
+if [ "$FILTER" != "" ]; then
+    SUBSTRING="${SUBSTRING};s/input = cms.untracked/output = cms.untracked/"
+fi
 sed -i.bak "${SUBSTRING}" ${WORKDIR}/${PYFILE}
 rm ${WORKDIR}/${PYFILE}.bak
 
