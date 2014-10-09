@@ -59,6 +59,10 @@ if [[ $STOREDIR =~ .*/store/cmst3.* ]]; then
     cmsMkdir ${STOREDIR}
     cmsStage -f ${WORKDIR}/${OUTFILE} ${STOREDIR}/${OUTFILE}
     rm ${WORKDIR}/${OUTFILE}
+elif [[ $STOREDIR =~ /afs/.* ]]; then
+    cmsMkdir ${STOREDIR}
+    cp -f ${WORKDIR}/${OUTFILE} ${STOREDIR}/${OUTFILE}
+    rm ${WORKDIR}/${OUTFILE}
 fi
 
 echo "Local output @ `hostname` stored @ ${WORKDIR}/${OUTFILE} being moved to ${STOREDIR}" 
